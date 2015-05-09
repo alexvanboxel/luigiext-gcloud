@@ -1,6 +1,6 @@
 import io
 
-from luigiext.gcloud import GCloudClient
+from luigiext.gcore import GCloudClient
 
 
 __author__ = 'alexvanboxel'
@@ -51,7 +51,7 @@ class GCSFileSystem(FileSystem):
 
     def exists(self, path):
         if path[-1:] == '/':
-            l = self._api.storage().objects().list(bucket=self._bucket,
+            l = self._api.storage_api().objects().list(bucket=self._bucket,
                                                    maxResults=5,
                                                    prefix=path)
             result = l.execute()
@@ -60,7 +60,7 @@ class GCSFileSystem(FileSystem):
             return False
         else:
             try:
-                o = self._api.storage().objects().get(bucket=self._bucket,
+                o = self._api.storage_api().objects().get(bucket=self._bucket,
                                                       object=path)
                 result = o.execute()
                 print(result)
@@ -108,7 +108,7 @@ class GCSTarget(FileSystemTarget):
 
     def touch(self):
         media = apiclient.http.MediaIoBaseUpload(io.BytesIO(''), 'application/octet-stream')
-        req = self.api.storage().objects().insert(
+        req = self.api.storage_api().objects().insert(
             bucket=self.bucket,
             name=self.path,
             media_body=media)
@@ -155,7 +155,7 @@ class AtomicGCSFile(AtomicLocalFile):
 
     def move_to_final_destination(self):
         media = apiclient.http.MediaFileUpload(self.tmp_path(), 'application/octet-stream')
-        req = self._api.storage().objects().insert(
+        req = self._api.storage_api().objects().insert(
             bucket=self.bucket,
             name=self.path,
             media_body=media)

@@ -1,30 +1,15 @@
-from ConfigParser import NoSectionError
 import webbrowser
-
 import logging
-import os
-import os.path
-import luigi
 
 from luigi import configuration
+
 # from luigi import six
 
-from luigi.format import FileWrapper
-from luigi.parameter import Parameter
-from luigi.target import FileSystem, FileSystemException, FileSystemTarget
-from luigi.task import ExternalTask
-import sys
 from googleapiclient.discovery import build
-from oauth2client.file import Storage
-from oauth2client.client import AccessTokenRefreshError, OAuth2Credentials
-from oauth2client.client import OAuth2WebServerFlow
-from oauth2client.tools import run
+from oauth2client.client import OAuth2Credentials
 from oauth2client.tools import client as oauthclient
-from googleapiclient.errors import HttpError
 import httplib2
 from oauth2client import gce
-import time
-import io
 
 
 logger = logging.getLogger('luigi-interface')
@@ -39,12 +24,11 @@ except ImportError:
 
 def load(file_name):
     with open(file_name, 'r') as f:
-        content=f.read()
+        content = f.read()
     return content
 
 
 class GCloudClient:
-
     def __init__(self, **kwargs):
         # for key, value in kwargs.iteritems():
         #     print "%s = %s" % (key, value)
@@ -54,12 +38,12 @@ class GCloudClient:
             'https://www.googleapis.com/auth/bigquery'
         ]
 
-        config = dict(configuration.get_config().items('gcloud'))
-        print(config)
-        auth_method = config.get("auth", "service")
+        self.config = dict(configuration.get_config().items('gcloud'))
+        print(self.config)
+        auth_method = self.config.get("auth", "service")
         if auth_method == 'secret':
-            secret_file = config.get("auth.secret.file", "secret.json")
-            credentials_file = config.get("auth.credentials.file", "credentials.json")
+            secret_file = self.config.get("auth.secret.file", "secret.json")
+            credentials_file = self.config.get("auth.credentials.file", "credentials.json")
             flow = oauthclient.flow_from_clientsecrets(
                 secret_file,
                 scope=scope,
@@ -67,7 +51,7 @@ class GCloudClient:
             try:
                 token_file = open(credentials_file, 'r')
                 self.credentials = OAuth2Credentials.from_json(token_file.read())
-                token_file.close();
+                token_file.close()
             except IOError:
                 auth_uri = flow.step1_get_authorize_url()
                 webbrowser.open(auth_uri)
@@ -75,13 +59,18 @@ class GCloudClient:
 
                 self.credentials = flow.step2_exchange(auth_code)
                 token_file = open(credentials_file, 'w')
-                token_file.write(self.credentials.to_json());
-                token_file.close();
+                token_file.write(self.credentials.to_json())
+                token_file.close()
         elif auth_method == 'service':
             self.credentials = gce.AppAssertionCredentials(scope=scope)
 
         self._http = self.credentials.authorize(httplib2.Http())
-        self._project_id = config.get("project_id")
+        self._project_number = self.config.get("project.number")
+        self._project_id = self.config.get("project.id")
+
+        self._defaults = {
+
+        }
 
     def http(self):
         return self._http
@@ -89,11 +78,35 @@ class GCloudClient:
     def bucket(self):
         return "vex-eu-data"
 
-    def bigquery(self):
+    def bigquery_api(self):
         return build('bigquery', 'v2', http=self._http)
 
-    def storage(self):
+    def storage_api(self):
         return build('storage', 'v1', http=self._http)
+
+    def dataflow_api(self):
+        return build('dataflow', 'v1b3', http=self._http)
+
+    def project_number(self):
+        return self._project_number
 
     def project_id(self):
         return self._project_id
+
+    def get(self, name):
+        return self.config.get(name) or self._defaults.get(name)
+
+
+default_client = None
+
+
+def set_default_api(gclient):
+    global default_client
+    default_client = gclient
+
+
+def get_default_api():
+    global default_client
+    if default_client is None:
+        default_client = GCloudClient()
+    return default_client

@@ -9,7 +9,7 @@ import luigi
 from luigi.target import FileSystemException
 from googleapiclient.errors import HttpError
 import time
-from luigiext.gcore import GCloudClient
+from luigiext.gcore import GCloudClient, get_default_api
 
 logger = logging.getLogger('luigi-interface')
 
@@ -21,17 +21,9 @@ except ImportError:
                    "runtime if gcloud functionality is used.")
 
 
-class InvalidDeleteException(FileSystemException):
-    pass
-
-
-class FileNotFoundException(FileSystemException):
-    pass
-
-
 def _wait_for_jobid_complete(api, jobId):
     while True:
-        status = api.bigquery().jobs().get(projectId=api.project_id(), jobId=jobId).execute()
+        status = api.bigquery_api().jobs().get(projectId=api.project_number(), jobId=jobId).execute()
         if 'DONE' == status['status']['state']:
             print "Done !" + str(status)
             return True
@@ -76,7 +68,7 @@ class _BqJob:
         print("REQ")
         print(job)
         self.api = api
-        self.job = self.api.bigquery().jobs().insert(projectId=api.project_id(), body=job).execute()
+        self.job = self.api.bigquery_api().jobs().insert(projectId=api.project_number(), body=job).execute()
         print("RES")
         print(self.job)
         self.job_id = self.job['jobReference']['jobId']
@@ -84,8 +76,8 @@ class _BqJob:
     def wait_for_done(self):
 
         while True:
-            self.job = self.api.bigquery().jobs().get(
-                projectId=self.api.project_id(),
+            self.job = self.api.bigquery_api().jobs().get(
+                projectId=self.api.project_number(),
                 jobId=self.job_id).execute()
             print("LOOP")
             print(self.job)
@@ -100,12 +92,12 @@ class _BqJob:
 
 class BqTableTarget(luigi.Target):
     def __init__(self, table, client=GCloudClient()):
-        self.client = client
+        self.api = client
         self.table = _split_tablename(table)
 
     def exists(self):
         print "checking existence"
-        tables = self.client.bigquery().tables()
+        tables = self.api.bigquery_api().tables()
         print "tables"
         try:
             table = tables.get(projectId=self.table['projectId'], datasetId=self.table['datasetId'],
@@ -119,7 +111,7 @@ class BqTableTarget(luigi.Target):
 
 
 class BqQueryTarget(luigi.Target):
-    def __init__(self, table, query, client=GCloudClient()):
+    def __init__(self, table, query=None, client=GCloudClient()):
         self.client = client
         self.table = _split_tablename(table)
         print "TABLE SPLIT: " + str(self.table)
@@ -130,14 +122,14 @@ class BqQueryTarget(luigi.Target):
 
     def exists(self):
         print "checking existence"
-        tables = self.client.bigquery().tables()
+        tables = self.client.bigquery_api().tables()
         print "tables"
         try:
             print "TABLE GET : " + str(self.table)
             table = tables.get(projectId=self.table['projectId'], datasetId=self.table['datasetId'],
                                tableId=self.table['tableId']).execute()
             print "table"
-            jobs = self.client.bigquery().jobs()
+            jobs = self.client.bigquery_api().jobs()
             job = {
                 'projectId': self.table['projectId'],
                 'configuration': {
@@ -148,6 +140,9 @@ class BqQueryTarget(luigi.Target):
                 }
             }
             logger.debug(table)
+            if self.query is None:
+                return True
+
             insertJob = jobs.insert(projectId=self.table['projectId'], body=job).execute()
             while True:
                 status = jobs.get(projectId=self.table['projectId'], jobId=insertJob['jobReference']['jobId']).execute()
@@ -163,7 +158,7 @@ class BqQueryTarget(luigi.Target):
                 time.sleep(5)
             return False
         except HttpError as err:
-            print "ERROR"
+            print "HttpError, could be table not found."
             return False
 
 
@@ -176,11 +171,10 @@ class BqTableLoadTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        api = GCloudClient()
-        self.api = api
-        self.http = api.http()
-        self.bq = api.bigquery()
-        self.gcs = api.storage()
+        self.api = kwargs.get("api") or get_default_api()
+        self.http = self.api.http()
+        self.bq = self.api.bigquery_api()
+        self.gcs = self.api.storage_api()
         super(BqTableLoadTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -242,11 +236,10 @@ class BqTableFromQueryTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        api = GCloudClient()
-        self.api = api
-        self.http = api.http()
-        self.bq = api.bigquery()
-        self.gcs = api.storage()
+        self.api = kwargs.get("api") or get_default_api()
+        self.http = self.api.http()
+        self.bq = self.api.bigquery_api()
+        self.gcs = self.api.storage_api()
         super(BqTableFromQueryTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -304,11 +297,10 @@ class BqQueryTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        api = GCloudClient()
-        self.api = api
-        self.http = api.http()
-        self.bq = api.bigquery()
-        self.gcs = api.storage()
+        self.api = kwargs.get("api") or get_default_api()
+        self.http = self.api.http()
+        self.bq = self.api.bigquery_api()
+        self.gcs = self.api.storage_api()
         super(BqQueryTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -351,7 +343,7 @@ class BqQueryTask(luigi.Task):
         configuration = self.configuration()
         query = Template(self.query()).substitute(self.params())
         job = {
-            'projectId': self.api.project_id(),
+            'projectId': self.api.project_number(),
             "configuration": {
                 "query": {
                     "query": query,
@@ -389,7 +381,7 @@ class BqQueryTask(luigi.Task):
                 result = insert_job.get()
 
                 job = {
-                    'projectId': self.api.project_id(),
+                    'projectId': self.api.project_number(),
                     'configuration': {
                         'extract': {
                             'sourceTable': {
@@ -410,10 +402,10 @@ class BqQueryTask(luigi.Task):
 
 
 class StorageMarkerTask(luigi.Task):
-    def __init__(self, client=GCloudClient(), *args, **kwargs):
-        self.client = client
-        self.http = client.http()
-        self.gcs = client.storage()
+    def __init__(self, *args, **kwargs):
+        self.api = kwargs.get("api") or get_default_api()
+        self.http = self.api.http()
+        self.gcs = self.api.storage_api()
         super(StorageMarkerTask, self).__init__(*args, **kwargs)
 
     def run(self):
