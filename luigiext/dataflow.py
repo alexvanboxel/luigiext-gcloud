@@ -11,9 +11,9 @@ class DataFlowJavaTask(luigi.Task):
 
     def __init__(self, *args, **kwargs):
         self.api = kwargs.get("api") or get_default_api()
-        self.http = self.api.http()
-        self.df = self.api.dataflow_api()
-        self.gcs = self.api.storage_api()
+        http = self.api.http()
+        self.df = self.api.dataflow_api(http)
+        self.gcs = self.api.storage_api(http)
         super(DataFlowJavaTask, self).__init__(*args, **kwargs)
 
     def requires(self):

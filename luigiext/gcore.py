@@ -3,6 +3,8 @@ import logging
 
 from luigi import configuration
 
+
+
 # from luigi import six
 
 from googleapiclient.discovery import build
@@ -64,7 +66,6 @@ class GCloudClient:
         elif auth_method == 'service':
             self.credentials = gce.AppAssertionCredentials(scope=scope)
 
-        self._http = self.credentials.authorize(httplib2.Http())
         self._project_number = self.config.get("project.number")
         self._project_id = self.config.get("project.id")
 
@@ -73,19 +74,19 @@ class GCloudClient:
         }
 
     def http(self):
-        return self._http
+        return self.credentials.authorize(httplib2.Http())
 
     def bucket(self):
         return "vex-eu-data"
 
-    def bigquery_api(self):
-        return build('bigquery', 'v2', http=self._http)
+    def bigquery_api(self, http=None):
+        return build('bigquery', 'v2', http=http or self.http())
 
-    def storage_api(self):
-        return build('storage', 'v1', http=self._http)
+    def storage_api(self, http=None):
+        return build('storage', 'v1', http=http or self.http())
 
-    def dataflow_api(self):
-        return build('dataflow', 'v1b3', http=self._http)
+    def dataflow_api(self, http=None):
+        return build('dataflow', 'v1b3', http=http or self.http())
 
     def project_number(self):
         return self._project_number

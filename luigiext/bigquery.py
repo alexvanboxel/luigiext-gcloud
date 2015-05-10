@@ -64,11 +64,12 @@ def _split_tablename(name):
 
 class _BqJob:
 
-    def __init__(self, api, job):
+    def __init__(self, bq, project_number, job):
         print("REQ")
         print(job)
-        self.api = api
-        self.job = self.api.bigquery_api().jobs().insert(projectId=api.project_number(), body=job).execute()
+        self.bq = bq
+        self.project_number = project_number
+        self.job = self.bq.jobs().insert(projectId=self.project_number, body=job).execute()
         print("RES")
         print(self.job)
         self.job_id = self.job['jobReference']['jobId']
@@ -76,8 +77,8 @@ class _BqJob:
     def wait_for_done(self):
 
         while True:
-            self.job = self.api.bigquery_api().jobs().get(
-                projectId=self.api.project_number(),
+            self.job = self.bq.jobs().get(
+                projectId=self.project_number,
                 jobId=self.job_id).execute()
             print("LOOP")
             print(self.job)
@@ -150,7 +151,7 @@ class BqQueryTarget(luigi.Target):
                 if 'DONE' == status['status']['state']:
                     print "Done exporting!" + str(status)
                     result = jobs.getQueryResults(projectId=self.table['projectId'],
-                                                  jobId=insertJob['jobReference']['jobId']).execute();
+                                                  jobId=insertJob['jobReference']['jobId']).execute()
                     print "RESULT : " + str(result)
                     print "VALUE : " + str(result['rows'][0]['f'][0]['v'])
                     return result['rows'][0]['f'][0]['v'] in ['true', 'True']
@@ -172,9 +173,9 @@ class BqTableLoadTask(luigi.Task):
 
     def __init__(self, *args, **kwargs):
         self.api = kwargs.get("api") or get_default_api()
-        self.http = self.api.http()
-        self.bq = self.api.bigquery_api()
-        self.gcs = self.api.storage_api()
+        http = self.api.http()
+        self._gbq = self.api.bigquery_api(http)
+        self._gcs = self.api.storage_api(http)
         super(BqTableLoadTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -196,7 +197,7 @@ class BqTableLoadTask(luigi.Task):
 
     def run(self):
         table = _split_tablename(self.table())
-        jobs = self.bq.jobs()
+        jobs = self._gbq.jobs()
         job = {
             'projectId': table['projectId'],
             'configuration': {
@@ -232,75 +233,15 @@ class BqTableCopyTask(luigi.Task):
         logger.info("Running BqTableCopyTask")
 
 
-class BqTableFromQueryTask(luigi.Task):
-    """ Load/Append data into a BigQuery table """
-
-    def __init__(self, *args, **kwargs):
-        self.api = kwargs.get("api") or get_default_api()
-        self.http = self.api.http()
-        self.bq = self.api.bigquery_api()
-        self.gcs = self.api.storage_api()
-        super(BqTableFromQueryTask, self).__init__(*args, **kwargs)
-
-    def schema(self):
-        raise NotImplementedError
-
-    def query(self):
-        raise NotImplementedError
-
-    def table(self):
-        """
-        Format 123456789:DataSet.Table
-        :return:
-        """
-        raise NotImplementedError
-
-    # def configure_source_format(self):
-    #     """Source Format default CSV. Possible values CSV,DATASTORE_BACKUP,NEWLINE_DELIMITED_JSON"""
-    #     return "CSV"
-
-    def run(self):
-        table = _split_tablename(self.table())
-        jobs = self.bq.jobs()
-        print("GDFGSDGDSHSDHSDHDFH")
-        job = {
-            'projectId': table['projectId'],
-            "configuration": {
-                "query": {
-                    "query": self.query(),
-                    'destinationTable': {
-                        'projectId': table['projectId'],
-                        'datasetId': table['datasetId'],
-                        'tableId': table['tableId']
-                    },
-                    "createDisposition": "CREATE_IF_NEEDED",
-                    "writeDisposition": "WRITE_APPEND"
-                }
-            }
-        }
-        schema = self.schema()
-        if schema is not None:
-            job["configuration"]["schema"] = {
-                'fields': schema
-            }
-        print "JOB : " + str(job)
-        insert_job = jobs.insert(projectId=table['projectId'], body=job).execute()
-        if _wait_for_job_complete(api=self.api, job=insert_job):
-            marker = self.output()
-            if callable(getattr(marker, "touch")):
-                logger.info("Writing marker file " + str(marker))
-                marker.touch()
-            return
-
-
 class BqQueryTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        self.api = kwargs.get("api") or get_default_api()
-        self.http = self.api.http()
-        self.bq = self.api.bigquery_api()
-        self.gcs = self.api.storage_api()
+        api = kwargs.get("api") or get_default_api()
+        self.project_number = api.project_number()
+        http = api.http()
+        self._gbq = api.bigquery_api(http)
+        self._gcs = api.storage_api(http)
         super(BqQueryTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -343,7 +284,7 @@ class BqQueryTask(luigi.Task):
         configuration = self.configuration()
         query = Template(self.query()).substitute(self.params())
         job = {
-            'projectId': self.api.project_number(),
+            'projectId': self.project_number,
             "configuration": {
                 "query": {
                     "query": query,
@@ -357,6 +298,9 @@ class BqQueryTask(luigi.Task):
             }
         if self.table() is None and self.destination() is None:
             raise RuntimeError("At least table or destination need to be supplied.")
+        if self.table() is not None and self.destination() is not None:
+            raise RuntimeError("Set either table or destination.")
+
         if self.table() is not None:
             table = _split_tablename(self.table())
             job["configuration"]["query"]["destinationTable"] = {
@@ -370,18 +314,18 @@ class BqQueryTask(luigi.Task):
                 configuration.get("writeDisposition", "WRITE_APPEND")
             job["configuration"]["query"]["allowLargeResults"] = \
                 configuration.get("allowLargeResults", "false")
-            insert_job = _BqJob(self.api, job=job)
+            insert_job = _BqJob(self._gbq, self.project_number, job=job)
             if insert_job.wait_for_done():
                 self._success()
 
         if self.destination() is not None:
-            insert_job = _BqJob(self.api, job=job)
+            insert_job = _BqJob(self._gbq, self.project_number, job=job)
             if insert_job.wait_for_done():
                 print(insert_job)
                 result = insert_job.get()
 
                 job = {
-                    'projectId': self.api.project_number(),
+                    'projectId': self.project_number,
                     'configuration': {
                         'extract': {
                             'sourceTable': {
@@ -396,20 +340,19 @@ class BqQueryTask(luigi.Task):
                         }
                     }
                 }
-                extract_job = _BqJob(self.api, job=job)
+                extract_job = _BqJob(self._gbq, self.project_number, job=job)
                 if extract_job.wait_for_done():
                     return
 
 
 class StorageMarkerTask(luigi.Task):
     def __init__(self, *args, **kwargs):
-        self.api = kwargs.get("api") or get_default_api()
-        self.http = self.api.http()
-        self.gcs = self.api.storage_api()
+        api = kwargs.get("api") or get_default_api()
+        self._gcs = api.storage_api()
         super(StorageMarkerTask, self).__init__(*args, **kwargs)
 
     def run(self):
-        marker = self.output();
+        marker = self.output()
         if callable(getattr(marker, "touch")):
             logger.info("Writing marker file " + str(marker))
             marker.touch()
