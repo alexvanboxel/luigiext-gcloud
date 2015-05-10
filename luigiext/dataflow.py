@@ -25,8 +25,8 @@ class DataFlowJavaTask(luigi.Task):
     def dataflow(self):
         raise NotImplementedError("subclass should define dataflow")
 
-    def options(self):
-        raise NotImplementedError("subclass should define options")
+    def configuration(self):
+        raise NotImplementedError("subclass should define configuration")
 
     def params(self):
         raise NotImplementedError("subclass should define params")
@@ -44,19 +44,19 @@ class DataFlowJavaTask(luigi.Task):
             sleep(5)
 
     def _build_cmd(self):
-        options = self.options()
+        config = self.configuration()
 
-        print(options)
+        print(config)
         command = [
             "java",
             "-jar",
-            options.get("basePath", ".") + self.dataflow(),
-            "--project=" + (options.get("projectId") or self.api.project_id()),
-            "--zone=" + (options.get("zone") or self.api.get("dataflow.zone")),
-            "--stagingLocation=" + (options.get("stagingLocation") or self.api.get("dataflow.staging")),
-            "--runner=" + (options.get("runner") or self.api.get("dataflow.runner")),
-            "--autoscalingAlgorithm=" + options.get("autoscalingAlgorithm", "BASIC"),
-            "--maxNumWorkers=" + options.get("maxNumWorkers", "50")
+            config.get("basePath", ".") + self.dataflow(),
+            "--project=" + (config.get("projectId") or self.api.project_id()),
+            "--zone=" + (config.get("zone") or self.api.get("dataflow.zone")),
+            "--stagingLocation=" + (config.get("stagingLocation") or self.api.get("dataflow.staging")),
+            "--runner=" + (config.get("runner") or self.api.get("dataflow.runner")),
+            "--autoscalingAlgorithm=" + config.get("autoscalingAlgorithm", "BASIC"),
+            "--maxNumWorkers=" + config.get("maxNumWorkers", "50")
         ]
 
         for attr, value in self.params().iteritems():

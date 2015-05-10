@@ -1,4 +1,5 @@
 import io
+import luigi
 
 from luigiext.gcore import get_default_api
 
@@ -153,5 +154,16 @@ class AtomicGCSFile(AtomicLocalFile):
         out = req.execute()
 
 
+class MarkerTask(luigi.Task):
+    def __init__(self, *args, **kwargs):
+        api = kwargs.get("api") or get_default_api()
+        self._gcs = api.storage_api()
+        super(MarkerTask, self).__init__(*args, **kwargs)
 
-
+    def run(self):
+        marker = self.output()
+        if callable(getattr(marker, "touch")):
+            logger.info("Writing marker file " + str(marker))
+            marker.touch()
+        else:
+            logger.error("Output " + str(marker) + " not writable")

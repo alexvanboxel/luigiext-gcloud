@@ -91,27 +91,7 @@ class _BqJob:
         return self.job
 
 
-class BqTableTarget(luigi.Target):
-    def __init__(self, table, client=GCloudClient()):
-        self.api = client
-        self.table = _split_tablename(table)
-
-    def exists(self):
-        print "checking existence"
-        tables = self.api.bigquery_api().tables()
-        print "tables"
-        try:
-            table = tables.get(projectId=self.table['projectId'], datasetId=self.table['datasetId'],
-                               tableId=self.table['tableId']).execute()
-            print "table"
-            logger.debug(table)
-            return True
-        except HttpError as err:
-            print "ERROR"
-            return False
-
-
-class BqQueryTarget(luigi.Target):
+class BigQueryTarget(luigi.Target):
     def __init__(self, table, query=None, client=GCloudClient()):
         self.client = client
         self.table = _split_tablename(table)
@@ -343,18 +323,3 @@ class BqQueryTask(luigi.Task):
                 extract_job = _BqJob(self._gbq, self.project_number, job=job)
                 if extract_job.wait_for_done():
                     return
-
-
-class StorageMarkerTask(luigi.Task):
-    def __init__(self, *args, **kwargs):
-        api = kwargs.get("api") or get_default_api()
-        self._gcs = api.storage_api()
-        super(StorageMarkerTask, self).__init__(*args, **kwargs)
-
-    def run(self):
-        marker = self.output()
-        if callable(getattr(marker, "touch")):
-            logger.info("Writing marker file " + str(marker))
-            marker.touch()
-        else:
-            logger.error("Output " + str(marker) + " not writable")
