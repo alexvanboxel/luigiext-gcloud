@@ -1,6 +1,12 @@
 *.iws
-*.iml
 *.ipr
 *.pyc
 .env
 .idea
+
+.DS_Store
+
+build/
+dist/
+*.egg-info/
+*.egg
