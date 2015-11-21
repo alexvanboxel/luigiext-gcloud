@@ -21,6 +21,8 @@ auth.credentials.file=/Users/alexvanboxel/flow/credentials.json
 project.number=0000000000000
 project.id=my-project-name
 
+bigquery.temp.dataset=temp
+
 dataflow.staging=gs://bucket/staging/
 dataflow.java.path=java
 dataflow.runner=BlockingDataflowPipelineRunner
@@ -57,7 +59,7 @@ class MyTask(luigi.Task):
         return GCSTarget(self.day.strftime('gs://bucket/data/aggregate/daily/foobar/%Y/%m/%d/'))
 ```
 
-Example task using the GCSFlagTarget: 
+Example for a MarkerTask using the GCSFlagTarget: 
 
 ```python
 from luigiext import gcs
@@ -67,7 +69,8 @@ class NightlyTask(gcs.MarkerTask):
     day = luigi.DateParameter
 
     def output(self):
-        return GCSFlagTarget(self.day.strftime('gs://bucket/data/marker/foobar/%Y/%m/%d/'), flag='_RUN')
+        return GCSFlagTarget(self.day.strftime('gs://bucket/data/marker/foobar/%Y/%m/%d/'), 
+            flag='_RUN')
 
 ```
 
@@ -161,15 +164,17 @@ Task that executes BQ query and outputs to storage:
 class MyQueryToStorageTask(bigquery.BqQueryTask):
     day = datetime.date.today()
 
+    # Using a flag target to make sure the task only runs once
     def output(self):
-        return GCSTarget(self.day.strftime('gs://bucket/data/output/%Y/%m/%d/'))
+        return GCSFlagTarget(self.day.strftime('gs://bucket/data/output/%Y/%m/%d/',flag='_PHASE_03_SQLEXPORT'))
 
     def destination(self):
         return self.day.strftime('gs://bucket/data/output/%Y/%m/%d/part-r-*.avro')
 
+    # if you set "allowLargeResults" to True, make sure you have a temp DataSet configured
     def configuration(self):
         return {
-            "writeDisposition": "WRITE_TRUNCATE"
+            "allowLargeResults": False
         }
 
     def query(self):
