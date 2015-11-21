@@ -1,15 +1,13 @@
 import logging
+from datetime import datetime
 from string import Template
 
 import luigi
-
-
 # from luigi import six
 
-from luigi.target import FileSystemException
 from googleapiclient.errors import HttpError
 import time
-from luigiext.gcore import GCloudClient, get_default_api
+from luigi_gcloud.gcore import get_default_api
 
 logger = logging.getLogger('luigi-interface')
 
@@ -19,21 +17,6 @@ try:
 except ImportError:
     logger.warning("Loading gcloud module without google-api-client installed. Will crash at "
                    "runtime if gcloud functionality is used.")
-
-
-def _wait_for_jobid_complete(api, jobId):
-    while True:
-        status = api.bigquery_api().jobs().get(projectId=api.project_number(), jobId=jobId).execute()
-        if 'DONE' == status['status']['state']:
-            print "Done !" + str(status)
-            return True
-        print 'Waiting for export to complete..'
-        time.sleep(5)
-
-
-def _wait_for_job_complete(api, job):
-    print(job)
-    return _wait_for_jobid_complete(api, jobId=job['jobReference']['jobId'])
 
 
 def _split_tablename(name):
@@ -63,16 +46,12 @@ def _split_tablename(name):
 
 
 class _BqJob:
-
     def __init__(self, bq, project_number, job):
-        print("REQ")
-        print(job)
         self.bq = bq
         self.project_number = project_number
         self.job = self.bq.jobs().insert(projectId=self.project_number, body=job).execute()
-        print("RES")
-        print(self.job)
         self.job_id = self.job['jobReference']['jobId']
+        logger.info('BigQuery job %s is %s', self.job_id, str(self.job['status']))
 
     def wait_for_done(self):
 
@@ -80,11 +59,17 @@ class _BqJob:
             self.job = self.bq.jobs().get(
                 projectId=self.project_number,
                 jobId=self.job_id).execute()
-            print("LOOP")
-            print(self.job)
             if 'DONE' == self.job['status']['state']:
+                if self.job['status'].has_key('errors'):
+                    logger.error('BigQuery job %s has errors', self.job_id)
+                    logger.error(str(self.job['status']['errors']))
+                    logger.debug(str(self.job))
+                    return False
+                else:
+                    logger.info('BigQuery job %s is DONE', self.job_id)
+                    return True
                 return True
-            print 'Waiting...'
+            logger.info('BigQuery job %s is %s', self.job_id, str(self.job['status']))
             time.sleep(5)
 
     def get(self):
@@ -92,25 +77,27 @@ class _BqJob:
 
 
 class BigQueryTarget(luigi.Target):
-    def __init__(self, table, query=None, client=GCloudClient()):
-        self.client = client
+    def __init__(self, table, query=None, client=get_default_api()):
+        self.api = client
         self.table = _split_tablename(table)
         print "TABLE SPLIT: " + str(self.table)
         self.query = query
+        http = self.api.http()
+        self._gbq = self.api.bigquery_api(http)
 
     def query(self):
         raise NotImplementedError
 
     def exists(self):
         print "checking existence"
-        tables = self.client.bigquery_api().tables()
+        tables = self._gbq.tables()
         print "tables"
         try:
             print "TABLE GET : " + str(self.table)
             table = tables.get(projectId=self.table['projectId'], datasetId=self.table['datasetId'],
                                tableId=self.table['tableId']).execute()
             print "table"
-            jobs = self.client.bigquery_api().jobs()
+            jobs = self._gbq.jobs()
             job = {
                 'projectId': self.table['projectId'],
                 'configuration': {
@@ -124,22 +111,17 @@ class BigQueryTarget(luigi.Target):
             if self.query is None:
                 return True
 
-            insertJob = jobs.insert(projectId=self.table['projectId'], body=job).execute()
-            while True:
-                status = jobs.get(projectId=self.table['projectId'], jobId=insertJob['jobReference']['jobId']).execute()
-                print status
-                if 'DONE' == status['status']['state']:
-                    print "Done exporting!" + str(status)
-                    result = jobs.getQueryResults(projectId=self.table['projectId'],
-                                                  jobId=insertJob['jobReference']['jobId']).execute()
-                    print "RESULT : " + str(result)
-                    print "VALUE : " + str(result['rows'][0]['f'][0]['v'])
-                    return result['rows'][0]['f'][0]['v'] in ['true', 'True']
-                print 'Waiting for export to complete..'
-                time.sleep(5)
-            return False
+            insert_job = _BqJob(self._gbq, self.table['projectId'], job=job)
+            if insert_job.wait_for_done():
+                result = insert_job.get()
+                result = jobs.getQueryResults(projectId=self.table['projectId'],
+                                              jobId=result['jobReference']['jobId']).execute()
+                print "RESULT : " + str(result)
+                print "VALUE : " + str(result['rows'][0]['f'][0]['v'])
+                return result['rows'][0]['f'][0]['v'] in ['true', 'True']
         except HttpError as err:
             print "HttpError, could be table not found."
+            print str(err)
             return False
 
 
@@ -171,11 +153,18 @@ class BqTableLoadTask(luigi.Task):
         """
         raise NotImplementedError
 
-    # def configure_source_format(self):
-    #     """Source Format default CSV. Possible values CSV,DATASTORE_BACKUP,NEWLINE_DELIMITED_JSON"""
-    #     return "CSV"
+    def configuration(self):
+        """
+        https://cloud.google.com/bigquery/docs/reference/v2/jobs
+        :return:
+        """
+        return {
+            "createDisposition": "CREATE_IF_NEEDED",
+            "writeDisposition": "WRITE_APPEND",
+        }
 
     def run(self):
+        configuration = self.configuration()
         table = _split_tablename(self.table())
         jobs = self._gbq.jobs()
         job = {
@@ -189,7 +178,8 @@ class BqTableLoadTask(luigi.Task):
                         'tableId': table['tableId']
                     },
                     'sourceFormat': 'NEWLINE_DELIMITED_JSON',
-                    'writeDisposition': 'WRITE_APPEND',
+                    'createDisposition': configuration.get("createDisposition", "CREATE_IF_NEEDED"),
+                    'writeDisposition': configuration.get("writeDisposition", "WRITE_APPEND"),
                     'sourceUris': [self.source()],
                     'maxBadRecords': 1000,
                     'schema': {
@@ -198,11 +188,10 @@ class BqTableLoadTask(luigi.Task):
                 }
             }
         }
-        print "JOB : " + str(job)
-        insert_job = jobs.insert(projectId=table['projectId'], body=job).execute()
-        if _wait_for_job_complete(self.api, job=insert_job):
+        load_job = _BqJob(self._gbq, table['projectId'], job=job)
+        if load_job.wait_for_done():
             marker = self.output()
-            if callable(getattr(marker, "touch")):
+            if hasattr(marker, "touch") and callable(getattr(marker, "touch")):
                 logger.info("Writing marker file " + str(marker))
                 marker.touch()
             return
@@ -217,11 +206,11 @@ class BqQueryTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        api = kwargs.get("api") or get_default_api()
-        self.project_number = api.project_number()
-        http = api.http()
-        self._gbq = api.bigquery_api(http)
-        self._gcs = api.storage_api(http)
+        self.api = kwargs.get("api") or get_default_api()
+        self.project_number = self.api.project_number()
+        http = self.api.http()
+        self._gbq = self.api.bigquery_api(http)
+        self._gcs = self.api.storage_api(http)
         super(BqQueryTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -247,7 +236,8 @@ class BqQueryTask(luigi.Task):
         """
         return {
             "createDisposition": "CREATE_IF_NEEDED",
-            "writeDisposition": "WRITE_EMPTY"
+            "writeDisposition": "WRITE_EMPTY",
+            "destinationFormat": "AVRO"
         }
 
     def params(self):
@@ -255,7 +245,7 @@ class BqQueryTask(luigi.Task):
 
     def _success(self):
         marker = self.output()
-        if callable(getattr(marker, "touch")):
+        if hasattr(marker, "touch") and callable(getattr(marker, "touch")):
             logger.info("Writing marker file " + str(marker))
             marker.touch()
         return
@@ -299,6 +289,18 @@ class BqQueryTask(luigi.Task):
                 self._success()
 
         if self.destination() is not None:
+            large = configuration.get("allowLargeResults", "false")
+            if str(large) in ("true", "1", "True"):
+                # This is a workaround for a BigQuery limitation, if the result is to large
+                # we need to set a destination table and do allowLargeResults
+                # we need a DataSet that has an expiration to make it work properly in production
+                job["configuration"]["query"]["destinationTable"] = {
+                    'projectId': self.project_number,
+                    'datasetId': self.api.get(configuration, "bigquery", "tempDataset"),
+                    'tableId': datetime.now().strftime("xlbq_%Y%m%d%H%M%S")
+                }
+                job["configuration"]["query"]["allowLargeResults"] = "true"
+
             insert_job = _BqJob(self._gbq, self.project_number, job=job)
             if insert_job.wait_for_done():
                 print(insert_job)
@@ -316,10 +318,10 @@ class BqQueryTask(luigi.Task):
                             'destinationUris': [
                                 self.destination()
                             ],
-                            'destinationFormat': 'AVRO'
+                            'destinationFormat': configuration.get("destinationFormat", "AVRO")
                         }
                     }
                 }
                 extract_job = _BqJob(self._gbq, self.project_number, job=job)
                 if extract_job.wait_for_done():
-                    return
+                    self._success()

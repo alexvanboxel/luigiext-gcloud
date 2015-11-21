@@ -13,6 +13,7 @@ from oauth2client.tools import client as oauthclient
 import httplib2
 from oauth2client import gce
 
+from luigi import configuration
 
 logger = logging.getLogger('luigi-interface')
 
@@ -70,7 +71,9 @@ class GCloudClient:
         self._project_id = self.config.get("project.id")
 
         self._defaults = {
-
+            "dataflow.configuration.default.autoscalingalgorithm": "BASIC",
+            "dataflow.configuration.default.maxnumworkers": "50",
+            "dataflow.configuration.default.basepath": "."
         }
 
     def http(self):
@@ -94,8 +97,13 @@ class GCloudClient:
     def project_id(self):
         return self._project_id
 
-    def get(self, name):
-        return self.config.get(name) or self._defaults.get(name)
+    def get(self, config, api, name):
+        key = (api + ".configuration.default." + name).lower()
+        print(self.config)
+        value = config.get(name) or self.config.get(key) or self._defaults.get(key)
+        if value is None:
+            raise ValueError("Value for " + name + " not found, either in defaults or configuration as key " + key)
+        return value
 
 
 default_client = None

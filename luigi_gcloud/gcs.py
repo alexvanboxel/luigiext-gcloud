@@ -1,8 +1,8 @@
 import io
+
 import luigi
 
-from luigiext.gcore import get_default_api
-
+from luigi_gcloud.gcore import get_default_api
 
 __author__ = 'alexvanboxel'
 
@@ -64,11 +64,11 @@ class GCSFileSystem(FileSystem):
             try:
                 o = self._gcs.objects().get(bucket=self._bucket,
                                             object=path)
-                result = o.execute()
-                print(result)
+                o.execute()
+                logger.debug("GCS found gs://"+self._bucket + "/" + path)
                 return True
             except HttpError:
-                print(path + "NOT FOUND")
+                logger.debug("GCS NOT FOUND gs://"+self._bucket + "/" + path)
                 return False
 
     def isdir(self, path):
@@ -79,6 +79,7 @@ class GCSFileSystem(FileSystem):
 
 
 class GCSTarget(FileSystemTarget):
+    format = None
     fs = None
     _bucket = None
     _gcs = None
@@ -86,9 +87,10 @@ class GCSTarget(FileSystemTarget):
     def __repr__(self):
         return "gs://" + self._bucket + "/" + self.path
 
-    def __init__(self, full_path, format=None, fs=None):
+    def __init__(self, full_path, format=luigi.format.get_default_format(), fs=None):
         self.fs = fs or GCSFileSystem()
         self._gcs = self.fs.storage_api()
+        self.format = format
         if full_path.startswith('gs://'):
             ix = full_path.find('/', 5)
             self._bucket = full_path[5:ix]
@@ -111,20 +113,14 @@ class GCSTarget(FileSystemTarget):
         out = req.execute()
         print(out)
 
-    def open(self, mode):
-        raise NotImplemented
-        # if mode not in ('r', 'w'):
-        #     raise ValueError("Unsupported open mode '%s'" % mode)
-        #
-        # if mode == 'r':
-        #     s3_key = self._fs.get_key(self.path)
-        #     if not s3_key:
-        #         raise FileNotFoundException("Could not find file at %s" % self.path)
-        #
-        #     fileobj = ReadableGCSFile(self._storage_api)
-        #     return self.format.pipe_reader(fileobj)
-        # else:
-        #     return self.format.pipe_writer(AtomicGCSFile(self.path, self._storage_api))
+    def open(self, mode='r'):
+        if mode == 'r':
+            return self.format.pipe_reader(self.fs.download(self.path))
+        elif mode == 'w':
+            print(self._bucket + "==="+self.path+"==="+str(self._gcs))
+            return self.format.pipe_writer(AtomicGCSFile(self._bucket, self.path, self._gcs))
+        else:
+            raise ValueError("Unsupported open mode '{}'".format(mode))
 
 
 class GCSFlagTarget(GCSTarget):
@@ -146,12 +142,14 @@ class AtomicGCSFile(AtomicLocalFile):
         super(AtomicGCSFile, self).__init__(path)
 
     def move_to_final_destination(self):
-        media = apiclient.http.MediaFileUpload(self.tmp_path(), 'application/octet-stream')
+        print(self.tmp_path)
+        media = apiclient.http.MediaFileUpload(self.tmp_path, 'application/octet-stream')
         req = self._gcs.objects().insert(
             bucket=self._bucket,
             name=self.path,
             media_body=media)
         out = req.execute()
+        print(out)
 
 
 class MarkerTask(luigi.Task):
@@ -162,7 +160,7 @@ class MarkerTask(luigi.Task):
 
     def run(self):
         marker = self.output()
-        if callable(getattr(marker, "touch")):
+        if hasattr(marker, "touch") and callable(getattr(marker, "touch")):
             logger.info("Writing marker file " + str(marker))
             marker.touch()
         else:
