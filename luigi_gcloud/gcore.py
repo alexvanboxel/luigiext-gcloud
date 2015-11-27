@@ -9,7 +9,7 @@ import httplib2
 from oauth2client import gce
 from luigi import configuration
 
-logger = logging.getLogger('luigi-interface')
+logger = logging.getLogger('luigi-gcloud')
 
 try:
     import apiclient
@@ -40,7 +40,8 @@ class GCloudClient:
         self._project_name = kwargs.get("name", "default")
         self._config_name = kwargs.get("config", "default")
 
-        print(self.config)
+        logger.debug(
+            "GCloudClient client created client name: " + self._project_name + ", config name: " + self._config_name)
         auth_method = self.config.get("api.project." + self._project_name + ".auth.method", "service")
         if auth_method == 'secret':
             secret_file = self.config.get("api.project." + self._project_name + ".auth.secret.file", "secret.json")
@@ -109,7 +110,6 @@ class GCloudClient:
 
     def get(self, config, api, name):
         key = (api + ".configuration." + self._config_name + "." + name).lower()
-        print(self.config)
         value = config.get(name) or self.config.get(key) or self._defaults.get(key)
         if value is None:
             raise ValueError("Value for " + name + " not found, either in defaults or configuration as key " + key)

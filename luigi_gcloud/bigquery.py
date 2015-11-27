@@ -9,7 +9,7 @@ from googleapiclient.errors import HttpError
 import time
 from luigi_gcloud.gcore import get_default_api
 
-logger = logging.getLogger('luigi-interface')
+logger = logging.getLogger('luigi-gcloud')
 
 try:
     import apiclient
@@ -80,7 +80,7 @@ class BigQueryTarget(luigi.Target):
     def __init__(self, table, query=None, client=get_default_api()):
         self.api = client
         self.table = _split_tablename(table)
-        print "TABLE SPLIT: " + str(self.table)
+        logger.debug("TABLE SPLIT: " + str(self.table))
         self.query = query
         http = self.api.http()
         self._gbq = self.api.bigquery_api(http)

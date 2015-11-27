@@ -14,7 +14,7 @@ from googleapiclient.errors import HttpError
 from luigi.target import FileSystem, FileSystemException, FileSystemTarget, AtomicLocalFile
 
 
-logger = logging.getLogger('luigi-interface')
+logger = logging.getLogger('luigi-gcloud')
 
 try:
     import apiclient
@@ -111,7 +111,7 @@ class GCSTarget(FileSystemTarget):
             name=self.path,
             media_body=media)
         out = req.execute()
-        print(out)
+        logger.warning("TODO: Need to handle out: "+str(out))
 
     def open(self, mode='r'):
         if mode == 'r':
@@ -130,11 +130,6 @@ class GCSFlagTarget(GCSTarget):
         super(GCSFlagTarget, self).__init__(path + flag, format, client)
 
 
-class ReadableGCSFile():
-    def sss(self):
-        print()
-
-
 class AtomicGCSFile(AtomicLocalFile):
     def __init__(self, bucket, path, storage_api):
         self._gcs = storage_api
@@ -142,14 +137,13 @@ class AtomicGCSFile(AtomicLocalFile):
         super(AtomicGCSFile, self).__init__(path)
 
     def move_to_final_destination(self):
-        print(self.tmp_path)
         media = apiclient.http.MediaFileUpload(self.tmp_path, 'application/octet-stream')
         req = self._gcs.objects().insert(
             bucket=self._bucket,
             name=self.path,
             media_body=media)
         out = req.execute()
-        print(out)
+        logger.warning("TODO: Need to handle out: "+str(out))
 
 
 class MarkerTask(luigi.Task):

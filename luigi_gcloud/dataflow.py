@@ -7,7 +7,7 @@ import luigi
 
 from luigi_gcloud.gcore import get_default_api
 
-logger = logging.getLogger('luigi-interface')
+logger = logging.getLogger('luigi-gcloud')
 
 
 class _DataflowJob:
@@ -29,12 +29,15 @@ class _DataflowJob:
                     raise Exception("Google Cloud Dataflow job " + str(self.job['name']) + " has failed.")
                 elif 'JOB_STATE_CANCELLED' == self.job['currentState']:
                     raise Exception("Google Cloud Dataflow job " + str(self.job['name']) + " was cancelled.")
+                elif 'JOB_STATE_RUNNING' == self.job['currentState']:
+                    time.sleep(10)
                 else:
                     logger.debug(str(self.job))
                     raise Exception("Google Cloud Dataflow job " + str(self.job['name']) + " was unknown state: " + str(
                         self.job['currentState']))
+            else:
+                time.sleep(15)
 
-            time.sleep(5)
             self.job = self._get_job()
 
     def get(self):
@@ -73,7 +76,7 @@ class _DataflowJava:
                     if self.job_id is not None:
                         return self.job_id
                     else:
-                        logger.debug(line)
+                        logger.debug(line[:-1])
             else:
                 logger.info("Waiting for DataFlow process to complete.")
 
@@ -115,7 +118,7 @@ class DataFlowJavaTask(luigi.Task):
         self._execute_track(cmd)
 
     def _execute_track(self, cmd):
-        print(cmd)
+        logger.debug("DataFlow process: " + str(cmd))
         job_id = _DataflowJava(cmd).wait_for_done()
         _DataflowJob(self.df, self.api.project_id(), job_id).wait_for_done()
         self._success()
@@ -129,8 +132,6 @@ class DataFlowJavaTask(luigi.Task):
 
     def _build_cmd(self):
         config = self.configuration()
-
-        print(config)
         command = [
             "java",
             "-jar",
