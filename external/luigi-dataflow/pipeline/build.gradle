@@ -1,0 +1,23 @@
+
+apply plugin: 'java'
+
+compileJava.options.encoding = 'UTF-8'
+sourceCompatibility = 1.8
+
+task pipelineCopy(type: Jar) {
+    manifest {
+        attributes 'Implementation-Title': 'DataFlow Copy Pipeline',
+                'Implementation-Version': version,
+                'Main-Class': 'luigi.gcloud.pipeline.CopyPipeline'
+    }
+    baseName = project.name + '-copy'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+jar.dependsOn pipelineCopy
+
+dependencies {
+    compile project(':transform')
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+}

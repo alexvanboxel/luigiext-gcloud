@@ -1,0 +1,5 @@
+rootProject.name = 'luigi-dataflow'
+
+include 'transform'
+include 'pipeline'
+
