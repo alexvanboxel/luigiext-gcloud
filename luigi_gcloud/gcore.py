@@ -9,6 +9,7 @@ import httplib2
 from oauth2client import gce
 from luigi import configuration
 
+
 logger = logging.getLogger('luigi-gcloud')
 
 try:
@@ -78,23 +79,29 @@ class GCloudClient:
             "dataflow.configuration." + self._config_name + ".basepath": "."
         }
 
-    def http(self):
+    def http_authorized(self):
         return self.credentials.authorize(httplib2.Http())
+
+    def http(self):
+        return httplib2.Http()
+
+    def oauth(self):
+        return self.credentials
 
     def bucket(self):
         return "vex-eu-data"
 
     def bigquery_api(self, http=None):
-        return build('bigquery', 'v2', http=http or self.http())
+        return build('bigquery', 'v2', http=http or self.http_authorized())
 
     def storage_api(self, http=None):
-        return build('storage', 'v1', http=http or self.http())
+        return build('storage', 'v1', http=http or self.http_authorized())
 
     def dataflow_api(self, http=None):
-        return build('dataflow', 'v1b3', http=http or self.http())
+        return build('dataflow', 'v1b3', http=http or self.http_authorized())
 
     def dataproc_api(self, http=None):
-        return build('dataproc', 'v1b3', http=http or self.http())
+        return build('dataproc', 'v1b3', http=http or self.http_authorized())
 
     def project_number(self):
         return self._project_number

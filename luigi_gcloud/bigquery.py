@@ -82,7 +82,7 @@ class BigQueryTarget(luigi.Target):
         self.table = _split_tablename(table)
         logger.debug("TABLE SPLIT: " + str(self.table))
         self.query = query
-        http = self.api.http()
+        http = self.api.http_authorized()
         self._gbq = self.api.bigquery_api(http)
 
     def query(self):
@@ -135,7 +135,7 @@ class BqTableLoadTask(luigi.Task):
 
     def __init__(self, *args, **kwargs):
         self.api = kwargs.get("api") or get_default_api()
-        http = self.api.http()
+        http = self.api.http_authorized()
         self._gbq = self.api.bigquery_api(http)
         self._gcs = self.api.storage_api(http)
         super(BqTableLoadTask, self).__init__(*args, **kwargs)
@@ -208,7 +208,7 @@ class BqQueryTask(luigi.Task):
     def __init__(self, *args, **kwargs):
         self.api = kwargs.get("api") or get_default_api()
         self.project_number = self.api.project_number()
-        http = self.api.http()
+        http = self.api.http_authorized()
         self._gbq = self.api.bigquery_api(http)
         self._gcs = self.api.storage_api(http)
         super(BqQueryTask, self).__init__(*args, **kwargs)
