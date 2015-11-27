@@ -7,7 +7,7 @@ import luigi
 
 from googleapiclient.errors import HttpError
 import time
-from luigi_gcloud.gcore import get_default_api
+from luigi_gcloud.gcore import get_default_client
 
 logger = logging.getLogger('luigi-gcloud')
 
@@ -77,7 +77,7 @@ class _BqJob:
 
 
 class BigQueryTarget(luigi.Target):
-    def __init__(self, table, query=None, client=get_default_api()):
+    def __init__(self, table, query=None, client=get_default_client()):
         self.api = client
         self.table = _split_tablename(table)
         logger.debug("TABLE SPLIT: " + str(self.table))
@@ -134,10 +134,10 @@ class BqTableLoadTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        self.api = kwargs.get("api") or get_default_api()
-        http = self.api.http_authorized()
-        self._gbq = self.api.bigquery_api(http)
-        self._gcs = self.api.storage_api(http)
+        self.client = kwargs.get("client") or get_default_client()
+        http = self.client.http_authorized()
+        self._gbq = self.client.bigquery_api(http)
+        self._gcs = self.client.storage_api(http)
         super(BqTableLoadTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -206,11 +206,11 @@ class BqQueryTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        self.api = kwargs.get("api") or get_default_api()
-        self.project_number = self.api.project_number()
-        http = self.api.http_authorized()
-        self._gbq = self.api.bigquery_api(http)
-        self._gcs = self.api.storage_api(http)
+        self.client = kwargs.get("client") or get_default_client()
+        self.project_number = self.client.project_number()
+        http = self.client.http_authorized()
+        self._gbq = self.client.bigquery_api(http)
+        self._gcs = self.client.storage_api(http)
         super(BqQueryTask, self).__init__(*args, **kwargs)
 
     def schema(self):
@@ -296,7 +296,7 @@ class BqQueryTask(luigi.Task):
                 # we need a DataSet that has an expiration to make it work properly in production
                 job["configuration"]["query"]["destinationTable"] = {
                     'projectId': self.project_number,
-                    'datasetId': self.api.get(configuration, "bigquery", "tempDataset"),
+                    'datasetId': self.client.get(configuration, "bigquery", "tempDataset"),
                     'tableId': datetime.now().strftime("xlbq_%Y%m%d%H%M%S")
                 }
                 job["configuration"]["query"]["allowLargeResults"] = "true"

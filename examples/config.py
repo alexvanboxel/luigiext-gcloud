@@ -10,4 +10,4 @@ def google_default_api():
     global gclient
     if gclient is None:
         gclient = GCloudClient()
-        gcore.set_default_api(gclient)
+        gcore.set_default_client(gclient)

@@ -4,7 +4,7 @@ import logging
 import luigi
 from luigi.contrib import gcs
 
-from luigi_gcloud.gcore import get_default_api
+from luigi_gcloud.gcore import get_default_client
 
 logger = logging.getLogger('luigi-gcloud')
 
@@ -30,7 +30,6 @@ class GCSFileSystem(gcs.GCSClient):
 
 # noinspection PyAbstractClass
 class GCSTarget(gcs.GCSTarget):
-    api = None
     storage_api = None
 
     def bucket(self):
@@ -45,7 +44,7 @@ class GCSTarget(gcs.GCSTarget):
         return self.path
 
     def __init__(self, path, format=None, client=None):
-        client = client or get_default_api()
+        client = client or get_default_client()
         self.storage_api = client.storage_api()
         super(GCSTarget, self).__init__(path, format, client=GCSFileSystem(client.oauth()))
 
@@ -63,7 +62,7 @@ class GCSFlagTarget(GCSTarget):
 
 class AtomicGCSFile(luigi.target.AtomicLocalFile):
     def __init__(self, path, client=None):
-        client = client or get_default_api()
+        client = client or get_default_client()
         self.gcs_client = gcs.GCSClient(client.oauth())
         super(AtomicGCSFile, self).__init__(path)
 
@@ -73,8 +72,8 @@ class AtomicGCSFile(luigi.target.AtomicLocalFile):
 
 class MarkerTask(luigi.Task):
     def __init__(self, *args, **kwargs):
-        api = kwargs.get("api") or get_default_api()
-        self._gcs = api.storage_api()
+        client = kwargs.get("api") or get_default_client()
+        self._gcs = client.storage_api()
         super(MarkerTask, self).__init__(*args, **kwargs)
 
     def run(self):

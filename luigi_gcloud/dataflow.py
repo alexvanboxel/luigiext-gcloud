@@ -5,7 +5,7 @@ import time
 
 import luigi
 
-from luigi_gcloud.gcore import get_default_api
+from luigi_gcloud.gcore import get_default_client
 
 logger = logging.getLogger('luigi-gcloud')
 
@@ -92,10 +92,10 @@ class DataFlowJavaTask(luigi.Task):
     """ Load/Append data into a BigQuery table """
 
     def __init__(self, *args, **kwargs):
-        self.api = kwargs.get("api") or get_default_api()
-        http = self.api.http_authorized()
-        self.df = self.api.dataflow_api(http)
-        self.gcs = self.api.storage_api(http)
+        self.client = kwargs.get("client") or get_default_client()
+        http = self.client.http_authorized()
+        self.df = self.client.dataflow_api(http)
+        self.gcs = self.client.storage_api(http)
         super(DataFlowJavaTask, self).__init__(*args, **kwargs)
 
     def requires(self):
@@ -120,7 +120,7 @@ class DataFlowJavaTask(luigi.Task):
     def _execute_track(self, cmd):
         logger.debug("DataFlow process: " + str(cmd))
         job_id = _DataflowJava(cmd).wait_for_done()
-        _DataflowJob(self.df, self.api.project_id(), job_id).wait_for_done()
+        _DataflowJob(self.df, self.client.project_id(), job_id).wait_for_done()
         self._success()
 
     def _success(self):
@@ -135,13 +135,13 @@ class DataFlowJavaTask(luigi.Task):
         command = [
             "java",
             "-jar",
-            self.api.get(config, "dataflow", "basePath") + self.dataflow(),
-            "--project=" + (config.get("projectId") or self.api.project_id()),
-            "--zone=" + self.api.get(config, "dataflow", "zone"),
-            "--stagingLocation=" + self.api.get(config, "dataflow", "stagingLocation"),
-            "--runner=" + self.api.get(config, "dataflow", "runner"),
-            "--autoscalingAlgorithm=" + self.api.get(config, "dataflow", "autoscalingAlgorithm"),
-            "--maxNumWorkers=" + self.api.get(config, "dataflow", "maxNumWorkers")
+            self.client.get(config, "dataflow", "basePath") + self.dataflow(),
+            "--project=" + (config.get("projectId") or self.client.project_id()),
+            "--zone=" + self.client.get(config, "dataflow", "zone"),
+            "--stagingLocation=" + self.client.get(config, "dataflow", "stagingLocation"),
+            "--runner=" + self.client.get(config, "dataflow", "runner"),
+            "--autoscalingAlgorithm=" + self.client.get(config, "dataflow", "autoscalingAlgorithm"),
+            "--maxNumWorkers=" + self.client.get(config, "dataflow", "maxNumWorkers")
         ]
 
         for attr, value in self.params().iteritems():

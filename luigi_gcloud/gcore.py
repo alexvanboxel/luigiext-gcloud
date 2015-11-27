@@ -126,17 +126,17 @@ class GCloudClient:
 default_client = None
 
 
-def set_default_api(gclient):
+def set_default_client(gclient):
     global default_client
     default_client = gclient
 
 
-def load_default_api(name, config):
+def load_default_client(name, config):
     global default_client
     default_client = GCloudClient(name=name, config=config)
 
 
-def get_default_api():
+def get_default_client():
     global default_client
     if default_client is None:
         default_client = GCloudClient()

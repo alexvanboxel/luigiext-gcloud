@@ -4,7 +4,7 @@ import subprocess
 
 import luigi
 
-from luigi_gcloud.gcore import get_default_api
+from luigi_gcloud.gcore import get_default_client
 
 logger = logging.getLogger('luigi-gcloud')
 
