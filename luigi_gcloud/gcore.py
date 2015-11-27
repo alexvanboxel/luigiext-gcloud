@@ -1,18 +1,12 @@
-import webbrowser
 import logging
-
-from luigi import configuration
-
-
-
+import webbrowser
 # from luigi import six
 
 from googleapiclient.discovery import build
-from oauth2client.client import OAuth2Credentials
+from oauth2client.client import OAuth2Credentials, GoogleCredentials
 from oauth2client.tools import client as oauthclient
 import httplib2
 from oauth2client import gce
-
 from luigi import configuration
 
 logger = logging.getLogger('luigi-interface')
@@ -42,11 +36,16 @@ class GCloudClient:
         ]
 
         self.config = dict(configuration.get_config().items('gcloud'))
+
+        self._project_name = kwargs.get("name", "default")
+        self._config_name = kwargs.get("config", "default")
+
         print(self.config)
-        auth_method = self.config.get("auth", "service")
+        auth_method = self.config.get("api.project." + self._project_name + ".auth.method", "service")
         if auth_method == 'secret':
-            secret_file = self.config.get("auth.secret.file", "secret.json")
-            credentials_file = self.config.get("auth.credentials.file", "credentials.json")
+            secret_file = self.config.get("api.project." + self._project_name + ".auth.secret.file", "secret.json")
+            credentials_file = self.config.get("api.project." + self._project_name + ".auth.credentials.file",
+                                               "credentials.json")
             flow = oauthclient.flow_from_clientsecrets(
                 secret_file,
                 scope=scope,
@@ -66,14 +65,16 @@ class GCloudClient:
                 token_file.close()
         elif auth_method == 'service':
             self.credentials = gce.AppAssertionCredentials(scope=scope)
+        elif auth_method == 'default':
+            self.credentials = GoogleCredentials.get_application_default()
 
-        self._project_number = self.config.get("project.number")
-        self._project_id = self.config.get("project.id")
+        self._project_number = self.config.get("api.project." + self._project_name + ".number")
+        self._project_id = self.config.get("api.project." + self._project_name + ".id")
 
         self._defaults = {
-            "dataflow.configuration.default.autoscalingalgorithm": "BASIC",
-            "dataflow.configuration.default.maxnumworkers": "50",
-            "dataflow.configuration.default.basepath": "."
+            "dataflow.configuration." + self._config_name + ".autoscalingalgorithm": "BASIC",
+            "dataflow.configuration." + self._config_name + ".maxnumworkers": "50",
+            "dataflow.configuration." + self._config_name + ".basepath": "."
         }
 
     def http(self):
@@ -91,14 +92,23 @@ class GCloudClient:
     def dataflow_api(self, http=None):
         return build('dataflow', 'v1b3', http=http or self.http())
 
+    def dataproc_api(self, http=None):
+        return build('dataproc', 'v1b3', http=http or self.http())
+
     def project_number(self):
         return self._project_number
+
+    def project_name(self):
+        return self._project_name
+
+    def config_name(self):
+        return self._config_name
 
     def project_id(self):
         return self._project_id
 
     def get(self, config, api, name):
-        key = (api + ".configuration.default." + name).lower()
+        key = (api + ".configuration." + self._config_name + "." + name).lower()
         print(self.config)
         value = config.get(name) or self.config.get(key) or self._defaults.get(key)
         if value is None:
@@ -112,6 +122,11 @@ default_client = None
 def set_default_api(gclient):
     global default_client
     default_client = gclient
+
+
+def load_default_api(name, config):
+    global default_client
+    default_client = GCloudClient(name=name, config=config)
 
 
 def get_default_api():
