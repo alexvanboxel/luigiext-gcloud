@@ -1,14 +1,12 @@
 import logging
 import webbrowser
-# from luigi import six
 
+import httplib2
 from googleapiclient.discovery import build
+from luigi import configuration
+from oauth2client import gce
 from oauth2client.client import OAuth2Credentials, GoogleCredentials
 from oauth2client.tools import client as oauthclient
-import httplib2
-from oauth2client import gce
-from luigi import configuration
-
 
 logger = logging.getLogger('luigi-gcloud')
 
@@ -82,14 +80,12 @@ class GCloudClient:
     def http_authorized(self):
         return self.credentials.authorize(httplib2.Http())
 
-    def http(self):
+    @staticmethod
+    def http():
         return httplib2.Http()
 
     def oauth(self):
         return self.credentials
-
-    def bucket(self):
-        return "vex-eu-data"
 
     def bigquery_api(self, http=None):
         return build('bigquery', 'v2', http=http or self.http_authorized())
@@ -115,7 +111,7 @@ class GCloudClient:
     def project_id(self):
         return self._project_id
 
-    def get(self, config, api, name):
+    def get(self, api, name, config={}):
         key = (api + ".configuration." + self._config_name + "." + name).lower()
         value = config.get(name) or self.config.get(key) or self._defaults.get(key)
         if value is None:

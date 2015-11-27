@@ -58,7 +58,8 @@ class _DataflowJava:
             return self.proc.stdout.readline()
         return None
 
-    def _extract_job(self, line):
+    @staticmethod
+    def _extract_job(line):
         if line is not None:
             if line.startswith("Submitted job: "):
                 return line[15:-1]
@@ -94,8 +95,8 @@ class DataFlowJavaTask(luigi.Task):
     def __init__(self, *args, **kwargs):
         self.client = kwargs.get("client") or get_default_client()
         http = self.client.http_authorized()
-        self.df = self.client.dataflow_api(http)
-        self.gcs = self.client.storage_api(http)
+        self.dataflow_api = self.client.dataflow_api(http)
+        self.storage_api = self.client.storage_api(http)
         super(DataFlowJavaTask, self).__init__(*args, **kwargs)
 
     def requires(self):
@@ -120,7 +121,7 @@ class DataFlowJavaTask(luigi.Task):
     def _execute_track(self, cmd):
         logger.debug("DataFlow process: " + str(cmd))
         job_id = _DataflowJava(cmd).wait_for_done()
-        _DataflowJob(self.df, self.client.project_id(), job_id).wait_for_done()
+        _DataflowJob(self.dataflow_api, self.client.project_id(), job_id).wait_for_done()
         self._success()
 
     def _success(self):
@@ -135,13 +136,13 @@ class DataFlowJavaTask(luigi.Task):
         command = [
             "java",
             "-jar",
-            self.client.get(config, "dataflow", "basePath") + self.dataflow(),
+            self.client.get("dataflow", "basePath", config) + self.dataflow(),
             "--project=" + (config.get("projectId") or self.client.project_id()),
-            "--zone=" + self.client.get(config, "dataflow", "zone"),
-            "--stagingLocation=" + self.client.get(config, "dataflow", "stagingLocation"),
-            "--runner=" + self.client.get(config, "dataflow", "runner"),
-            "--autoscalingAlgorithm=" + self.client.get(config, "dataflow", "autoscalingAlgorithm"),
-            "--maxNumWorkers=" + self.client.get(config, "dataflow", "maxNumWorkers")
+            "--zone=" + self.client.get("dataflow", "zone", config),
+            "--stagingLocation=" + self.client.get("dataflow", "stagingLocation", config),
+            "--runner=" + self.client.get("dataflow", "runner", config),
+            "--autoscalingAlgorithm=" + self.client.get("dataflow", "autoscalingAlgorithm", config),
+            "--maxNumWorkers=" + self.client.get("dataflow", "maxNumWorkers", config)
         ]
 
         for attr, value in self.params().iteritems():

@@ -68,7 +68,6 @@ class _BqJob:
                 else:
                     logger.info('BigQuery job %s is DONE', self.job_id)
                     return True
-                return True
             logger.info('BigQuery job %s is %s', self.job_id, str(self.job['status']))
             time.sleep(5)
 
@@ -296,7 +295,7 @@ class BqQueryTask(luigi.Task):
                 # we need a DataSet that has an expiration to make it work properly in production
                 job["configuration"]["query"]["destinationTable"] = {
                     'projectId': self.project_number,
-                    'datasetId': self.client.get(configuration, "bigquery", "tempDataset"),
+                    'datasetId': self.client.get( "bigquery", "tempDataset" ,configuration),
                     'tableId': datetime.now().strftime("xlbq_%Y%m%d%H%M%S")
                 }
                 job["configuration"]["query"]["allowLargeResults"] = "true"

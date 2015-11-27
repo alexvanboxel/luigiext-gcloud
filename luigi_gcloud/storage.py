@@ -24,8 +24,9 @@ class GCSFileSystem(gcs.GCSClient):
 
         return self.client.objects().insert(bucket=bucket, name=obj, media_body=media).execute()
 
-        # def __init__(self, oauth_credentials=None, descriptor='', http_=None,
-        #              chunksize=gcs.CHUNKSIZE):
+    def __init__(self, client=None, descriptor='', http_=None, chunksize=gcs.CHUNKSIZE):
+        client = client or get_default_client()
+        super(GCSFileSystem, self).__init__(client.oauth(), descriptor, http_, chunksize)
 
 
 # noinspection PyAbstractClass
