@@ -18,7 +18,7 @@ except ImportError:
                    "runtime if gcloud functionality is used.")
 
 
-def load(file_name):
+def load_query_file(file_name):
     with open(file_name, 'r') as f:
         content = f.read()
     return content
@@ -26,9 +26,6 @@ def load(file_name):
 
 class GCloudClient:
     def __init__(self, **kwargs):
-        # for key, value in kwargs.iteritems():
-        #     print "%s = %s" % (key, value)
-
         scope = kwargs.get("scope") or [
             'https://www.googleapis.com/auth/devstorage.full_control',
             'https://www.googleapis.com/auth/bigquery'
@@ -111,11 +108,14 @@ class GCloudClient:
     def project_id(self):
         return self._project_id
 
-    def get(self, api, name, config={}):
+    def get(self, api, name, config={}, default=None):
         key = (api + ".configuration." + self._config_name + "." + name).lower()
         value = config.get(name) or self.config.get(key) or self._defaults.get(key)
         if value is None:
-            raise ValueError("Value for " + name + " not found, either in defaults or configuration as key " + key)
+            if default is None:
+                raise ValueError("Value for " + name + " not found, either in defaults or configuration as key " + key)
+            else:
+                return default
         return value
 
 

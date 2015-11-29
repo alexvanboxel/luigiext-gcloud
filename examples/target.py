@@ -9,12 +9,11 @@ class GSStoragePathWrapper:
         self._bucket = _client.get("var", "bucket")
         self._path = path
 
-    @property
-    def source(self):
-        return 'gs://' + self._bucket + '/luigi-gcloud-examples/' + self._path + '/part*'
+    def part(self, part):
+        return 'gs://' + self._bucket + '/luigi-gcloud-examples/' + self._path + '/' + part
 
     @property
-    def output(self):
+    def path(self):
         return 'gs://' + self._bucket + '/luigi-gcloud-examples' + self._path + '/'
 
     @property
@@ -33,7 +32,7 @@ class GSStorageFileWrapper:
         self._path = path
 
     @property
-    def output(self):
+    def path(self):
         return 'gs://' + self._bucket + '/luigi-gcloud-examples' + self._path
 
     @property
@@ -45,8 +44,8 @@ def storage_mail_path(bucket):
     return GSStorageFileWrapper(path=bucket.strftime('/mail/%Y/%m/%d/data.txt'))
 
 
-def storage_mail_dump(bucket):
-    return GSStoragePathWrapper(path=bucket.strftime('/dump/%Y/%m/%d'))
+def storage_mail(bucket, name):
+    return GSStoragePathWrapper(path=bucket.strftime('/' + name + '/%Y/%m/%d'))
 
 
 def local_mail_path(bucket):

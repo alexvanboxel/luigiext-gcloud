@@ -6,7 +6,48 @@ Hadoop, it works but could be faster through the native API. For an article abou
 the usage goto: 
 
 http://alex.vanboxel.be/2015/03/12/using-luigi-on-the-google-cloud-platform/
+(deprecated)
 
+
+## Getting started
+
+Requirements
+
+* Python 2.7
+* Java 1.8 (for the DataFlow example)
+* Storage bucket
+* BigQuery dataset (examples)
+
+
+```
+github 
+virtualenv .env
+source .env/bin/activate
+python setup.py install
+```
+
+
+Example of config (default account):
+
+ $ cat /etc/luigi/client.cfg
+
+```
+[gcloud]
+api.project.examples.auth.method=default
+api.project.examples.number=0000000000000
+api.project.examples.id=my-project-name
+
+dataflow.configuration.examples.stagingLocation=gs://my-bucket/staging/
+dataflow.configuration.examples.runner=DataflowPipelineRunner
+dataflow.configuration.examples.zone=europe-west1-d
+dataflow.configuration.examples.basePath=./external/luigi-dataflow
+dataflow.configuration.examples.staging=gs://my-bucket/staging/
+dataflow.configuration.examples.maxnumworkers=1
+
+var.configuration.examples.bucket=my-bucket
+
+dataflow.java.path=java
+```
 
 Example of config (local auth with secret):
 
@@ -14,19 +55,11 @@ Example of config (local auth with secret):
 
 ```
 [gcloud]
-auth=secret
-auth.secret.file=/Users/alexvanboxel/flow/testsecret.json
-auth.credentials.file=/Users/alexvanboxel/flow/credentials.json
-
-project.number=0000000000000
-project.id=my-project-name
-
-bigquery.temp.dataset=temp
-
-dataflow.staging=gs://bucket/staging/
-dataflow.java.path=java
-dataflow.runner=BlockingDataflowPipelineRunner
-dataflow.zone=europe-west1-d
+api.project.examples.auth.method=secret
+api.project.examples.auth.secret.file=/Users/alexvanboxel/flow/testsecret.json
+api.project.examples.auth.credentials.file=/Users/alexvanboxel/flow/credentials.json
+api.project.examples.number=0000000000000
+api.project.examples.id=my-project-name
 ```
 
 Example of config (in cloud service account):
@@ -35,15 +68,9 @@ Example of config (in cloud service account):
 
 ```
 [gcloud]
-auth=service
-
-project.number=0000000000000
-project.id=my-project-name
-
-dataflow.staging=gs://bucket/staging/
-dataflow.java.path=java
-dataflow.runner=BlockingDataflowPipelineRunner
-dataflow.zone=europe-west1-d
+api.project.examples.auth.method=service
+api.project.examples.number=0000000000000
+api.project.examples.id=my-project-name
 ```
 
 ## Google Cloud Storage
@@ -74,7 +101,32 @@ class NightlyTask(gcs.MarkerTask):
 
 ```
 
-## Google Big Query
+Exanple of copying a local file to cloud storage.
+
+```python
+class CopyLocalToStorage(luigi.Task):
+    day = luigi.DateParameter()
+
+    def output(self):
+        return GCSTarget("gs://bucket/data/mail.out")
+
+    def run(self):
+        fs = GCSFileSystem()
+        fs.put("./data/mail.out", "gs://bucket/data/mail.out")
+```
+
+## Google BigQuery
+
+
+```
+    def configuration(self):
+        return {
+            'sourceFormat': "NEWLINE_DELIMITED_JSON",
+            'createDisposition': "CREATE_IF_NEEDED",
+            'writeDisposition': "WRITE_APPEND"
+        }
+```
+
 
 Task using the BigQueryTask. Look to the existence of a BQ table.
 
@@ -110,7 +162,7 @@ class MyTask(luigi.Task):
 Task that loads data from storage to a BigQuery table:
 
 ```python
-class MyMailLoadTask(bigquery.BqTableLoadTask):
+class MyMailLoadTask(bigquery.BigQueryLoadTask):
 
     def schema(self):
         return [
@@ -183,37 +235,34 @@ class MyQueryToStorageTask(bigquery.BqQueryTask):
 ```
 
 
-
 ## Google Cloud DataFlow
 
-Task that executes BQ query and output a new table:
+Execute a Google Cloud DataFlow.
 
 ```python
-class MyDataFlowToBigQueryTask(dataflow.DataFlowJavaTask):
-    day = luigi.DateParameter
+class CopyViaDataFlowToStorage(DataFlowJavaTask):
+    day = luigi.DateParameter()
+
+    def output(self):
+        return GCSTarget('gs://bucket/data/out/')
+
+    def requires(self):
+        return CopyLocalToStorage(self.day)
 
     def dataflow(self):
-        return "/pipeline/flow/build/libs/pipeline/flow-all-1.0.jar"
+        return "/pipeline/build/libs/pipeline-copy-1.0.jar"
 
-    def table(self):
-        return self.day.strftime("0000000000000:foo.bar")
- 
     def configuration(self):
         return {
-            "basePath": "/workflow/dataflow",
+            "runner": "DataflowPipelineRunner",
             "autoscalingAlgorithm": "BASIC",
-            "maxNumWorkers": "50"
+            "maxNumWorkers": "80"
         }
 
     def params(self):
         return {
-            'inputBase': 'gs://bucket/data/someinput/',
-            'month': self.day.strftime('%Y-%m')
+            'in': 'gs://bucket/data/in/',
+            'out': 'gs://bucket/data/out/'
         }
-
-    def output(self):
-        return bigquery.BigQueryTarget(
-            table=self.table()
-        )
 ```
 

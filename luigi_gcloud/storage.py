@@ -47,7 +47,7 @@ class GCSTarget(gcs.GCSTarget):
     def __init__(self, path, format=None, client=None):
         client = client or get_default_client()
         self.storage_api = client.storage_api()
-        super(GCSTarget, self).__init__(path, format, client=GCSFileSystem(client.oauth()))
+        super(GCSTarget, self).__init__(path, format, client=GCSFileSystem(client))
 
     def touch(self):
         out = self.fs.touch(self.path)
