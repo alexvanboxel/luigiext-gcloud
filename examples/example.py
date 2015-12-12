@@ -5,6 +5,7 @@ import luigi
 from luigi.interface import setup_interface_logging
 
 import target
+from dataproc_example import DataProcExamples
 from luigi_gcloud.bigquery import BigQueryLoadTask, BigQueryTask
 from luigi_gcloud.dataflow import DataFlowJavaTask
 from luigi_gcloud.gcore import load_default_client, load_query_file
@@ -134,6 +135,7 @@ class ExamplesAll(luigi.WrapperTask):
     def requires(self):
         return [
             CopyAllLocalToStorage(),
+            DataProcExamples(),
             CopyViaDataFlowToStorage(datetime.date(2015, 11, 23)),
             CopyBigQueryToStorage(datetime.date(2015, 11, 24))
         ]

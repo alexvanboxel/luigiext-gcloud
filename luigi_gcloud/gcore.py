@@ -1,7 +1,10 @@
 import logging
+import uuid
 import webbrowser
+from string import Template
 
 import httplib2
+import luigi
 from googleapiclient.discovery import build
 from luigi import configuration
 from oauth2client import gce
@@ -67,6 +70,7 @@ class GCloudClient:
 
         self._project_number = self.config.get("api.project." + self._project_name + ".number")
         self._project_id = self.config.get("api.project." + self._project_name + ".id")
+        self._staging = self.config.get("api.project." + self._project_name + ".staging")
 
         self._defaults = {
             "dataflow.configuration." + self._config_name + ".autoscalingalgorithm": "BASIC",
@@ -84,6 +88,9 @@ class GCloudClient:
     def oauth(self):
         return self.credentials
 
+    def staging(self):
+        return self._staging
+
     def bigquery_api(self, http=None):
         return build('bigquery', 'v2', http=http or self.http_authorized())
 
@@ -94,7 +101,7 @@ class GCloudClient:
         return build('dataflow', 'v1b3', http=http or self.http_authorized())
 
     def dataproc_api(self, http=None):
-        return build('dataproc', 'v1b3', http=http or self.http_authorized())
+        return build('dataproc', 'v1beta1', http=http or self.http_authorized())
 
     def project_number(self):
         return self._project_number
@@ -120,6 +127,40 @@ class GCloudClient:
 
 
 default_client = None
+
+
+class _GCloudTask(luigi.Task):
+    client = None
+    config_name = None
+    bigquery_api = None
+    config_name = None
+    uuid = str(uuid.uuid1())[:13]
+    _resolved_name = None
+
+    def variables(self):
+        return None
+
+    def configuration(self):
+        return {}
+
+    def name(self):
+        return type(self).__name__
+
+    def resolved_name(self):
+        if self._resolved_name is None:
+            name = self.name()
+            if self.variables() is not None:
+                name = Template(self.name()).substitute(self.variables())
+            self._resolved_name = name + "__" + self.uuid
+        return self._resolved_name
+
+    def get_config_value(self, key, default=None):
+        config = self.configuration()
+        return self.client.get(self.config_name, key, config, default)
+
+    def __init__(self, *args, **kwargs):
+        self.client = kwargs.get("client") or get_default_client()
+        super(_GCloudTask, self).__init__(*args, **kwargs)
 
 
 def set_default_client(gclient):
