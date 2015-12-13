@@ -49,7 +49,7 @@ class _DataProcJob:
 
 
 class DataProcPigTask(_GCloudTask):
-    config_name = "dataproc"
+    service_name = "dataproc"
 
     def query_file(self):
         return None
@@ -74,7 +74,7 @@ class DataProcPigTask(_GCloudTask):
                     "jobId": name,
                 },
                 "placement": {
-                    "clusterName": self.get_config_value("clusterName", "cluster-1")
+                    "clusterName": self.get_service_value("clusterName", "cluster-1")
                 },
                 "pigJob": {
                     "continueOnFailure": False,

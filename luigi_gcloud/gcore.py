@@ -131,9 +131,9 @@ default_client = None
 
 class _GCloudTask(luigi.Task):
     client = None
-    config_name = None
+    service_name = None
     bigquery_api = None
-    config_name = None
+    service_name = None
     uuid = str(uuid.uuid1())[:13]
     _resolved_name = None
 
@@ -154,9 +154,12 @@ class _GCloudTask(luigi.Task):
             self._resolved_name = name + "__" + self.uuid
         return self._resolved_name
 
-    def get_config_value(self, key, default=None):
+    def get_service_value(self, key, default=None):
         config = self.configuration()
-        return self.client.get(self.config_name, key, config, default)
+        return self.client.get(self.service_name, key, config, default)
+
+    def get_variable_value(self, default=None):
+        return self.get_service_value(self.service_name, 'var', default)
 
     def __init__(self, *args, **kwargs):
         self.client = kwargs.get("client") or get_default_client()

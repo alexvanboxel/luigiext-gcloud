@@ -5,7 +5,7 @@ import time
 
 import luigi
 
-from luigi_gcloud.gcore import get_default_client
+from luigi_gcloud.gcore import get_default_client, _GCloudTask
 
 logger = logging.getLogger('luigi-gcloud')
 
@@ -89,15 +89,8 @@ class _DataflowJava:
         self.proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-class DataFlowJavaTask(luigi.Task):
-    """ Load/Append data into a BigQuery table """
-
-    def __init__(self, *args, **kwargs):
-        self.client = kwargs.get("client") or get_default_client()
-        http = self.client.http_authorized()
-        self.dataflow_api = self.client.dataflow_api(http)
-        self.storage_api = self.client.storage_api(http)
-        super(DataFlowJavaTask, self).__init__(*args, **kwargs)
+class DataFlowJavaTask(_GCloudTask):
+    service_name = 'dataflow'
 
     def requires(self):
         return []
@@ -108,20 +101,16 @@ class DataFlowJavaTask(luigi.Task):
     def dataflow(self):
         raise NotImplementedError("subclass should define dataflow")
 
-    def configuration(self):
-        raise NotImplementedError("subclass should define configuration")
-
-    def params(self):
-        raise NotImplementedError("subclass should define params")
-
     def run(self):
         cmd = self._build_cmd()
         self._execute_track(cmd)
 
     def _execute_track(self, cmd):
+        http = self.client.http_authorized()
+        dataflow_api = self.client.dataflow_api(http)
         logger.debug("DataFlow process: " + str(cmd))
         job_id = _DataflowJava(cmd).wait_for_done()
-        _DataflowJob(self.dataflow_api, self.client.project_id(), job_id).wait_for_done()
+        _DataflowJob(dataflow_api, self.client.project_id(), job_id).wait_for_done()
         self._success()
 
     def _success(self):
@@ -145,7 +134,7 @@ class DataFlowJavaTask(luigi.Task):
             "--maxNumWorkers=" + self.client.get("dataflow", "maxNumWorkers", config)
         ]
 
-        for attr, value in self.params().iteritems():
+        for attr, value in self.variables().iteritems():
             command.append("--" + attr + "=" + value)
 
         return command

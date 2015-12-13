@@ -7,7 +7,7 @@ import luigi
 
 from googleapiclient.errors import HttpError
 import time
-from luigi_gcloud.gcore import get_default_client
+from luigi_gcloud.gcore import get_default_client, _GCloudTask
 from luigi_gcloud.storage import GCSTarget
 
 logger = logging.getLogger('luigi-gcloud')
@@ -130,16 +130,10 @@ class BigQueryTarget(luigi.Target):
             return False
 
 
-class _BqTask(luigi.Task):
+class _BqTask(_GCloudTask):
+    service_name = 'bigquery'
     client = None
     bigquery_api = None
-
-    def configuration(self):
-        return {}
-
-    def get_config_value(self, key, default=None):
-        config = self.configuration()
-        return self.client.get("bigquery", key, config, default)
 
     def __init__(self, *args, **kwargs):
         self.client = kwargs.get("client") or get_default_client()
@@ -183,9 +177,9 @@ class BigQueryLoadTask(_BqTask):
                         'datasetId': table['datasetId'],
                         'tableId': table['tableId']
                     },
-                    'sourceFormat': self.get_config_value("sourceFormat", "NEWLINE_DELIMITED_JSON"),
-                    'createDisposition': self.get_config_value("createDisposition", "CREATE_IF_NEEDED"),
-                    'writeDisposition': self.get_config_value("writeDisposition", "WRITE_APPEND"),
+                    'sourceFormat': self.get_service_value("sourceFormat", "NEWLINE_DELIMITED_JSON"),
+                    'createDisposition': self.get_service_value("createDisposition", "CREATE_IF_NEEDED"),
+                    'writeDisposition': self.get_service_value("writeDisposition", "WRITE_APPEND"),
                     'sourceUris': [self.source()],
                     'maxBadRecords': 1000,
                     'schema': {
@@ -236,9 +230,6 @@ class BigQueryTask(_BqTask):
     def destination(self):
         return None
 
-    def params(self):
-        return {}
-
     def _success(self):
         marker = self.output()
         if hasattr(marker, "touch") and callable(getattr(marker, "touch")):
@@ -247,7 +238,7 @@ class BigQueryTask(_BqTask):
         return
 
     def run(self):
-        query = Template(self.query()).substitute(self.params())
+        query = Template(self.query()).substitute(self.variables())
         job = {
             'projectId': self.client.project_id(),
             "configuration": {
@@ -274,24 +265,24 @@ class BigQueryTask(_BqTask):
                 'tableId': table['tableId']
             }
             job["configuration"]["query"]["createDisposition"] = \
-                self.get_config_value("createDisposition", "CREATE_IF_NEEDED")
+                self.get_service_value("createDisposition", "CREATE_IF_NEEDED")
             job["configuration"]["query"]["writeDisposition"] = \
-                self.get_config_value("writeDisposition", "WRITE_APPEND")
+                self.get_service_value("writeDisposition", "WRITE_APPEND")
             job["configuration"]["query"]["allowLargeResults"] = \
-                self.get_config_value("allowLargeResults", "false")
+                self.get_service_value("allowLargeResults", "false")
             insert_job = _BqJob(self.bigquery_api, self.client.project_id(), job=job)
             if insert_job.wait_for_done():
                 self._success()
 
         if self.destination() is not None:
-            large = self.get_config_value("allowLargeResults", "false")
+            large = self.get_service_value("allowLargeResults", "false")
             if str(large) in ("true", "1", "True"):
                 # This is a workaround for a BigQuery limitation, if the result is to large
                 # we need to set a destination table and do allowLargeResults
                 # we need a DataSet that has an expiration to make it work properly in production
                 job["configuration"]["query"]["destinationTable"] = {
                     'projectId': self.client.project_id(),
-                    'datasetId': self.get_config_value("bigquery", "tempDataset"),
+                    'datasetId': self.get_service_value("bigquery", "tempDataset"),
                     'tableId': datetime.now().strftime("xlbq_%Y%m%d%H%M%S")
                 }
                 job["configuration"]["query"]["allowLargeResults"] = "true"
@@ -312,7 +303,7 @@ class BigQueryTask(_BqTask):
                             'destinationUris': [
                                 self.destination()
                             ],
-                            'destinationFormat': self.get_config_value("destinationFormat", "NEWLINE_DELIMITED_JSON")
+                            'destinationFormat': self.get_service_value("destinationFormat", "NEWLINE_DELIMITED_JSON")
                         }
                     }
                 }

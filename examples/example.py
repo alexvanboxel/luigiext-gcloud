@@ -26,9 +26,9 @@ class CopyBigQueryToStorage(BigQueryTask):
     def destination(self):
         return target.storage_mail(self.day, 'bq2st').part('part-*.json')
 
-    def params(self):
+    def variables(self):
         return {
-            'temp_dataset': self.get_config_value('tempDataset')
+            'temp_dataset': self.get_service_value('tempDataset')
         }
 
     def query(self):
@@ -44,9 +44,9 @@ class CopyBigQueryToBigQuery(BigQueryTask):
     def table(self):
         return "example_copy"
 
-    def params(self):
+    def variables(self):
         return {
-            'temp_dataset': self.get_config_value('tempDataset')
+            'temp_dataset': self.get_service_value('tempDataset')
         }
 
     def query(self):
@@ -121,10 +121,10 @@ class CopyViaDataFlowToStorage(DataFlowJavaTask):
         return {
             "runner": "DataflowPipelineRunner",
             "autoscalingAlgorithm": "BASIC",
-            "maxNumWorkers": "80"
+            "maxNumWorkers": "3"
         }
 
-    def params(self):
+    def variables(self):
         return {
             'in': target.storage_mail_path(self.day).path,
             'out': target.storage_mail(self.day, 'df').path

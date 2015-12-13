@@ -259,7 +259,7 @@ class CopyViaDataFlowToStorage(DataFlowJavaTask):
             "maxNumWorkers": "80"
         }
 
-    def params(self):
+    def variables(self):
         return {
             'in': 'gs://bucket/data/in/',
             'out': 'gs://bucket/data/out/'
