@@ -55,7 +55,7 @@ class DataProcPigTask(_GCloudTask):
         return None
 
     def query_uri(self):
-        return self.client.staging() + self.resolved_name() + ".pig"
+        return self.client.project_staging() + self.resolved_name() + ".pig"
 
     def run(self):
         http = self.client.http_authorized()

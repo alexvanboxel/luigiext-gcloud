@@ -71,12 +71,7 @@ class GCloudClient:
         self._project_number = self.config.get("api.project." + self._project_name + ".number")
         self._project_id = self.config.get("api.project." + self._project_name + ".id")
         self._staging = self.config.get("api.project." + self._project_name + ".staging")
-
-        self._defaults = {
-            "dataflow.configuration." + self._config_name + ".autoscalingalgorithm": "BASIC",
-            "dataflow.configuration." + self._config_name + ".maxnumworkers": "50",
-            "dataflow.configuration." + self._config_name + ".basepath": "."
-        }
+        self._zone = self.config.get("api.project." + self._project_name + ".zone")
 
     def http_authorized(self):
         return self.credentials.authorize(httplib2.Http())
@@ -88,8 +83,11 @@ class GCloudClient:
     def oauth(self):
         return self.credentials
 
-    def staging(self):
+    def project_staging(self):
         return self._staging
+
+    def project_zone(self):
+        return self._zone
 
     def bigquery_api(self, http=None):
         return build('bigquery', 'v2', http=http or self.http_authorized())
@@ -117,7 +115,7 @@ class GCloudClient:
 
     def get(self, api, name, config={}, default=None):
         key = (api + ".configuration." + self._config_name + "." + name).lower()
-        value = config.get(name) or self.config.get(key) or self._defaults.get(key)
+        value = config.get(name) or self.config.get(key)
         if value is None:
             if default is None:
                 raise ValueError("Value for " + name + " not found, either in defaults or configuration as key " + key)

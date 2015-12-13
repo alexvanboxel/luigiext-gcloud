@@ -36,12 +36,10 @@ Example of config (default account):
 api.project.examples.auth.method=default
 api.project.examples.number=0000000000000
 api.project.examples.id=my-project-name
+api.project.examples.staging=gs://my-bucket/staging/
+api.project.examples.zone=europe-west1-d
 
-dataflow.configuration.examples.stagingLocation=gs://my-bucket/staging/
-dataflow.configuration.examples.runner=DataflowPipelineRunner
-dataflow.configuration.examples.zone=europe-west1-d
 dataflow.configuration.examples.basePath=./external/luigi-dataflow
-dataflow.configuration.examples.staging=gs://my-bucket/staging/
 dataflow.configuration.examples.maxnumworkers=1
 
 var.configuration.examples.bucket=my-bucket
@@ -60,6 +58,8 @@ api.project.examples.auth.secret.file=/Users/alexvanboxel/flow/testsecret.json
 api.project.examples.auth.credentials.file=/Users/alexvanboxel/flow/credentials.json
 api.project.examples.number=0000000000000
 api.project.examples.id=my-project-name
+api.project.examples.staging=gs://my-bucket/staging/
+api.project.examples.zone=europe-west1-d
 ```
 
 Example of config (in cloud service account):
@@ -71,6 +71,8 @@ Example of config (in cloud service account):
 api.project.examples.auth.method=service
 api.project.examples.number=0000000000000
 api.project.examples.id=my-project-name
+api.project.examples.staging=gs://my-bucket/staging/
+api.project.examples.zone=europe-west1-d
 ```
 
 ## Google Cloud Storage
@@ -83,7 +85,7 @@ from luigiext.gcs import GCSTarget
 class MyTask(luigi.Task):
 
     def output(self):
-        return GCSTarget(self.day.strftime('gs://bucket/data/aggregate/daily/foobar/%Y/%m/%d/'))
+        return GCSTarget(self.day.strftime('gs://my-bucket/data/aggregate/daily/foobar/%Y/%m/%d/'))
 ```
 
 Example for a MarkerTask using the GCSFlagTarget: 
@@ -96,7 +98,7 @@ class NightlyTask(gcs.MarkerTask):
     day = luigi.DateParameter
 
     def output(self):
-        return GCSFlagTarget(self.day.strftime('gs://bucket/data/marker/foobar/%Y/%m/%d/'), 
+        return GCSFlagTarget(self.day.strftime('gs://my-bucket/data/marker/foobar/%Y/%m/%d/'), 
             flag='_RUN')
 
 ```
@@ -108,11 +110,11 @@ class CopyLocalToStorage(luigi.Task):
     day = luigi.DateParameter()
 
     def output(self):
-        return GCSTarget("gs://bucket/data/mail.out")
+        return GCSTarget("gs://my-bucket/data/mail.out")
 
     def run(self):
         fs = GCSFileSystem()
-        fs.put("./data/mail.out", "gs://bucket/data/mail.out")
+        fs.put("./data/mail.out", "gs://my-bucket/data/mail.out")
 ```
 
 ## Google BigQuery
@@ -173,7 +175,7 @@ class MyMailLoadTask(bigquery.BigQueryLoadTask):
         ]
 
     def source(self):
-        return 'gs://bucket/data/output/bigquery/mail/part*'
+        return 'gs://my-bucket/data/output/bigquery/mail/part*'
 
     def table(self):
         return "0000000000000:foo.bar"
@@ -218,10 +220,10 @@ class MyQueryToStorageTask(bigquery.BqQueryTask):
 
     # Using a flag target to make sure the task only runs once
     def output(self):
-        return GCSFlagTarget(self.day.strftime('gs://bucket/data/output/%Y/%m/%d/',flag='_PHASE_03_SQLEXPORT'))
+        return GCSFlagTarget(self.day.strftime('gs://my-bucket/data/output/%Y/%m/%d/',flag='_PHASE_03_SQLEXPORT'))
 
     def destination(self):
-        return self.day.strftime('gs://bucket/data/output/%Y/%m/%d/part-r-*.avro')
+        return self.day.strftime('gs://my-bucket/data/output/%Y/%m/%d/part-r-*.avro')
 
     # if you set "allowLargeResults" to True, make sure you have a temp DataSet configured
     def configuration(self):
@@ -244,7 +246,7 @@ class CopyViaDataFlowToStorage(DataFlowJavaTask):
     day = luigi.DateParameter()
 
     def output(self):
-        return GCSTarget('gs://bucket/data/out/')
+        return GCSTarget('gs://my-bucket/data/out/')
 
     def requires(self):
         return CopyLocalToStorage(self.day)
@@ -254,15 +256,13 @@ class CopyViaDataFlowToStorage(DataFlowJavaTask):
 
     def configuration(self):
         return {
-            "runner": "DataflowPipelineRunner",
-            "autoscalingAlgorithm": "BASIC",
             "maxNumWorkers": "80"
         }
 
     def variables(self):
         return {
-            'in': 'gs://bucket/data/in/',
-            'out': 'gs://bucket/data/out/'
+            'in': 'gs://my-bucket/data/in/',
+            'out': 'gs://my-bucket/data/out/'
         }
 ```
 

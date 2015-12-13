@@ -3,9 +3,7 @@ import select
 import subprocess
 import time
 
-import luigi
-
-from luigi_gcloud.gcore import get_default_client, _GCloudTask
+from luigi_gcloud.gcore import _GCloudTask
 
 logger = logging.getLogger('luigi-gcloud')
 
@@ -121,17 +119,16 @@ class DataFlowJavaTask(_GCloudTask):
         return
 
     def _build_cmd(self):
-        config = self.configuration()
         command = [
             "java",
             "-jar",
-            self.client.get("dataflow", "basePath", config) + self.dataflow(),
-            "--project=" + (config.get("projectId") or self.client.project_id()),
-            "--zone=" + self.client.get("dataflow", "zone", config),
-            "--stagingLocation=" + self.client.get("dataflow", "stagingLocation", config),
-            "--runner=" + self.client.get("dataflow", "runner", config),
-            "--autoscalingAlgorithm=" + self.client.get("dataflow", "autoscalingAlgorithm", config),
-            "--maxNumWorkers=" + self.client.get("dataflow", "maxNumWorkers", config)
+            self.get_service_value("basePath", ".") + self.dataflow(),
+            "--project=" + self.get_service_value("projectId", self.client.project_id()),
+            "--zone=" + self.get_service_value("zone", self.client.project_zone()),
+            "--stagingLocation=" + self.get_service_value("stagingLocation", self.client.project_staging()),
+            "--runner=DataflowPipelineRunner",
+            "--autoscalingAlgorithm=" + self.get_service_value("autoscalingAlgorithm", "BASIC"),
+            "--maxNumWorkers=" + self.get_service_value("maxNumWorkers", "50")
         ]
 
         for attr, value in self.variables().iteritems():
