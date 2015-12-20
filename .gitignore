@@ -1,8 +1,10 @@
 *.iws
 *.ipr
 *.pyc
+*.iml
 .env
 .idea
+.gradle
 
 .DS_Store
 
@@ -10,3 +12,5 @@ build/
 dist/
 *.egg-info/
 *.egg
+
+**/target/*

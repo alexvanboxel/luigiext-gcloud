@@ -115,7 +115,7 @@ class CopyViaDataFlowToStorage(DataFlowJavaTask):
         return CopyLocalToStorage(self.day)
 
     def dataflow(self):
-        return "/pipeline/build/libs/pipeline-copy-1.0.jar"
+        return "/luigi-dataflow/pipeline/build/libs/pipeline-copy-1.0.jar"
 
     def configuration(self):
         return {

@@ -11,22 +11,21 @@ from luigi_gcloud.storage import GCSFileSystem
 logger = logging.getLogger('luigi-gcloud')
 
 
-
 class _DataProcJob:
     def __init__(self, dataproc_api, project_id, job):
         self.dataproc_api = dataproc_api
         self.project_id = project_id
         self.job = dataproc_api.projects().jobs().submit(
-            projectId=self.project_id,
-            body=job).execute()
+                projectId=self.project_id,
+                body=job).execute()
         self.job_id = self.job['reference']['jobId']
         logger.info('DataProc job %s is %s', self.job_id, str(self.job['status']['state']))
 
     def wait_for_done(self):
         while True:
             self.job = self.dataproc_api.projects().jobs().get(
-                projectId=self.project_id,
-                jobId=self.job_id).execute()
+                    projectId=self.project_id,
+                    jobId=self.job_id).execute()
             if 'ERROR' == self.job['status']['state']:
                 print(str(self.job))
                 logger.error('DataProc job %s has errors', self.job_id)
@@ -85,6 +84,63 @@ class DataProcPigTask(_GCloudTask):
         variables = self.variables()
         if variables is not None:
             job["job"]["pigJob"]["scriptVariables"] = variables
+
+        print(job)
+        submitted = _DataProcJob(dataproc_api, self.client.project_id(), job)
+        if not submitted.wait_for_done():
+            submitted.raise_error("DataProcTask has errors")
+
+
+class DataProcSparkTask(_GCloudTask):
+    service_name = "dataproc"
+
+    def job_file(self):
+        return None
+
+    def job_uri(self):
+        return self.client.project_staging() + self.resolved_name() + ".jar"
+
+    def libs_uris(self):
+        return []
+
+    def main(self):
+        raise NotImplementedError
+
+    def args(self):
+        return []
+
+    def run(self):
+        http = self.client.http_authorized()
+        dataproc_api = self.client.dataproc_api(http)
+        name = self.resolved_name()
+
+        if self.job_file() is not None:
+            logger.warning("Copying job artifact to storage. Consider uploading outside of job.")
+            fs = GCSFileSystem()
+            fs.put(self.get_service_value("basePath", ".") + self.job_file(),
+                   self.job_uri())
+
+        artifacts = [self.job_uri()]
+        artifacts.extend(self.libs_uris())
+
+        job = {
+            "job": {
+                "reference": {
+                    "projectId": self.client.project_id(),
+                    "jobId": name,
+                },
+                "placement": {
+                    "clusterName": self.get_service_value("clusterName", "cluster-1")
+                },
+                "sparkJob": {
+                    "mainClass": self.main(),
+                    "jarFileUris": artifacts,
+                }
+            }
+        }
+        args = self.args()
+        if args is not None:
+            job["job"]["sparkJob"]["args"] = args
 
         print(job)
         submitted = _DataProcJob(dataproc_api, self.client.project_id(), job)

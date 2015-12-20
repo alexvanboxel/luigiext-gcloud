@@ -1,0 +1,59 @@
+apply plugin: 'scala'
+
+repositories {
+    maven {
+        url  "http://jcenter.bintray.com"
+    }
+    mavenLocal()
+}
+
+configurations {
+    provided
+}
+
+sourceSets {
+    main.compileClasspath += configurations.provided
+    test.compileClasspath += configurations.provided
+    test.runtimeClasspath += configurations.provided
+}
+
+dependencies {
+    compile 'org.scala-lang:scala-library:2.10.6'
+    provided 'org.apache.spark:spark-core_2.10:1.5.2'
+    provided 'org.apache.spark:spark-sql_2.10:1.5.2'
+    provided 'org.apache.spark:spark-hive_2.10:1.5.2'
+}
+
+//dependencies {
+//    compile 'org.scala-lang:scala-library:2.11.7'
+//    provided 'org.apache.spark:spark-core_2.11:1.5.2'
+//    provided 'org.apache.spark:spark-sql_2.11:1.5.2'
+//    provided 'org.apache.spark:spark-hive_2.11:1.5.2'
+//    compile 'com.databricks:spark-avro_2.11:2.0.1'
+//}
+//
+sourceCompatibility = 1.8
+version = '1.0'
+compileJava.options.encoding = 'UTF-8'
+
+jar {
+    manifest.attributes provider: 'gradle'
+}
+
+task pipelineCopy(type: Jar) {
+    zip64 true
+    manifest {
+        attributes 'Implementation-Title': 'Spark Copy',
+                'Implementation-Version': version,
+                'Main-Class': 'Legacy'
+    }
+    baseName = project.name + '-copy'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+jar.dependsOn pipelineCopy
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.9'
+}
