@@ -1,4 +1,4 @@
-from luigi_gcloud.gcs import GCSTarget, GCSFlagTarget
+from luigi_gcloud.storage import GCSTarget, GCSFlagTarget
 
 from luigi_gcloud.gcore import get_default_client
 

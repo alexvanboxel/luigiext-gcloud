@@ -101,6 +101,9 @@ class GCloudClient:
     def dataproc_api(self, http=None):
         return build('dataproc', 'v1beta1', http=http or self.http_authorized())
 
+    def logging_api(self, http=None):
+        return build('logging', 'v2beta1', http=http or self.http_authorized())
+
     def project_number(self):
         return self._project_number
 

@@ -74,6 +74,6 @@ class DataProcExamples(luigi.WrapperTask):
 
 
 if __name__ == "__main__":
-    setup_interface_logging('examples/logging.ini')
     load_default_client("examples", "examples")
+    setup_interface_logging('examples/logging.ini')
     luigi.run()
