@@ -100,7 +100,7 @@ class DataProcSparkTask(_GCloudTask):
     def job_uri(self):
         return self.client.project_staging() + self.resolved_name() + ".jar"
 
-    def libs_uris(self):
+    def lib_uris(self):
         return []
 
     def main(self):
@@ -121,7 +121,7 @@ class DataProcSparkTask(_GCloudTask):
                    self.job_uri())
 
         artifacts = [self.job_uri()]
-        artifacts.extend(self.libs_uris())
+        artifacts.extend(self.lib_uris())
 
         job = {
             "job": {
