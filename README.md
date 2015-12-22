@@ -1,3 +1,10 @@
+Please refer to the github wiki page:
+
+https://github.com/alexvanboxel/luigiext-gcloud/wiki
+
+this is getting currently the most love... if the project stabilises some of the
+info will flow back to this README
+
 # luigiext-gcloud
 
 Luigi tasks I use to communicate with Google Cloud Platform. For now it has some 
