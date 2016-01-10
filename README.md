@@ -68,4 +68,4 @@ class DataProcSparkCopy(DataProcSparkTask):
 ### Cloud Logging integration
 
 ![Logging to Cloud Logging](https://storage.googleapis.com/iotope-assert/luigi-gcloud-wiki/logging.png)
-What is luigi-gcloud, what is luigi and explain workflows and how they fit in.
+

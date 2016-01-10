@@ -5,7 +5,7 @@ except ImportError:
 
 setup(
     name="luigi-gcloud",
-    version="0.0.1",
+    version="0.3",
     description="Extends Luigi with support for the Google Cloud Platform.",
     url="https://github.com/alexvanboxel/luigiext-gcloud",
     author="Alex Van Boxel",
