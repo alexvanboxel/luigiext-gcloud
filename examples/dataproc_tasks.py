@@ -1,18 +1,19 @@
-import datetime
 import logging
 
 import luigi
-from luigi.interface import setup_interface_logging
 
 import target
 from luigi_gcloud.dataproc import DataProcPigTask, DataProcSparkTask
-from luigi_gcloud.gcore import load_default_client
+from storage_tasks import CopyLocalToStorage
 
 logger = logging.getLogger('luigi-interface')
 
 
 class DataProcPigCopy(DataProcPigTask):
     day = luigi.DateParameter()
+
+    def requires(self):
+        return CopyLocalToStorage(self.day)
 
     def output(self):
         return target.storage_mail(self.day, 'dp').gcs
@@ -37,6 +38,9 @@ class DataProcPigCopy(DataProcPigTask):
 
 class DataProcSparkCopy(DataProcSparkTask):
     day = luigi.DateParameter()
+
+    def requires(self):
+        return CopyLocalToStorage(self.day)
 
     def output(self):
         return target.storage_mail(self.day, 'dp').gcs
@@ -63,17 +67,3 @@ class DataProcSparkCopy(DataProcSparkTask):
             'month': self.day.strftime('%m'),
             'day': self.day.strftime('%d'),
         }
-
-
-class DataProcExamples(luigi.WrapperTask):
-    def requires(self):
-        return [
-            DataProcPigCopy(datetime.date(2015, 11, 23)),
-            DataProcSparkCopy(datetime.date(2015, 11, 24)),
-        ]
-
-
-if __name__ == "__main__":
-    load_default_client("examples", "examples")
-    setup_interface_logging('examples/logging.ini')
-    luigi.run()
