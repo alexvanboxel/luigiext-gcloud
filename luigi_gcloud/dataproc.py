@@ -56,6 +56,9 @@ class DataProcPigTask(_GCloudTask):
     def query_uri(self):
         return self.client.project_staging() + self.resolved_name() + ".pig"
 
+    def lib_uris(self):
+        return []
+
     def run(self):
         http = self.client.http_authorized()
         dataproc_api = self.client.dataproc_api(http)
@@ -65,6 +68,8 @@ class DataProcPigTask(_GCloudTask):
             fs = GCSFileSystem()
             fs.put(self.query_file(),
                    self.query_uri())
+
+        artifacts = self.lib_uris()
 
         job = {
             "job": {
@@ -78,6 +83,7 @@ class DataProcPigTask(_GCloudTask):
                 "pigJob": {
                     "continueOnFailure": False,
                     "queryFileUri": self.query_uri(),
+                    "jarFileUris": artifacts,
                 }
             }
         }
