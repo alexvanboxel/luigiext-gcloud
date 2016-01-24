@@ -1,14 +1,12 @@
 import logging
-import select
-import subprocess
-
-import luigi
 import time
 
-from luigi_gcloud.gcore import get_default_client, _GCloudTask
+from luigi_gcloud.gcore import _GCloudTask
 from luigi_gcloud.storage import GCSFileSystem
 
 logger = logging.getLogger('luigi-gcloud')
+
+default_pig_udf = None
 
 
 class _DataProcJob:
@@ -115,6 +113,18 @@ class DataProcSparkTask(_GCloudTask):
     def args(self):
         return []
 
+    def _jar_file_uris(self):
+        global default_pig_udf
+        artifacts = [self.job_uri()]
+        uris = self.lib_uris()
+        artifacts.extend(uris)
+        if default_pig_udf is not None:
+            if not default_pig_udf.append and len(uris) == 0:
+                artifacts.extend(default_pig_udf.uris)
+            elif default_pig_udf.append:
+                artifacts.extend(default_pig_udf.uris)
+        return artifacts
+
     def run(self):
         http = self.client.http_authorized()
         dataproc_api = self.client.dataproc_api(http)
@@ -125,9 +135,6 @@ class DataProcSparkTask(_GCloudTask):
             fs = GCSFileSystem()
             fs.put(self.get_service_value("basePath", ".") + self.job_file(),
                    self.job_uri())
-
-        artifacts = [self.job_uri()]
-        artifacts.extend(self.lib_uris())
 
         job = {
             "job": {
@@ -140,7 +147,7 @@ class DataProcSparkTask(_GCloudTask):
                 },
                 "sparkJob": {
                     "mainClass": self.main(),
-                    "jarFileUris": artifacts,
+                    "jarFileUris": self._jar_file_uris(),
                 }
             }
         }
@@ -152,3 +159,11 @@ class DataProcSparkTask(_GCloudTask):
         submitted = _DataProcJob(dataproc_api, self.client.project_id(), job)
         if not submitted.wait_for_done():
             submitted.raise_error("DataProcTask has errors")
+
+
+def set_default_pig_udf(uris, append=False):
+    global default_pig_udf
+    default_pig_udf = {
+        'append': append,
+        'uris': uris
+    }
