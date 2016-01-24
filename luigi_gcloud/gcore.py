@@ -1,4 +1,5 @@
 import logging
+import sys
 import uuid
 import webbrowser
 from string import Template
@@ -40,16 +41,16 @@ class GCloudClient:
         self._config_name = kwargs.get("config", "default")
 
         logger.debug(
-            "GCloudClient client created client name: " + self._project_name + ", config name: " + self._config_name)
+                "GCloudClient client created client name: " + self._project_name + ", config name: " + self._config_name)
         auth_method = self.config.get("api.project." + self._project_name + ".auth.method", "service")
         if auth_method == 'secret':
             secret_file = self.config.get("api.project." + self._project_name + ".auth.secret.file", "secret.json")
             credentials_file = self.config.get("api.project." + self._project_name + ".auth.credentials.file",
                                                "credentials.json")
             flow = oauthclient.flow_from_clientsecrets(
-                secret_file,
-                scope=scope,
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob')
+                    secret_file,
+                    scope=scope,
+                    redirect_uri='urn:ietf:wg:oauth:2.0:oob')
             try:
                 token_file = open(credentials_file, 'r')
                 self.credentials = OAuth2Credentials.from_json(token_file.read())
@@ -172,9 +173,20 @@ def set_default_client(gclient):
     default_client = gclient
 
 
-def load_default_client(name, config):
+def load_default_client(project, config):
     global default_client
-    default_client = GCloudClient(name=name, config=config)
+    gcloud_args_ix = [n for n, l in enumerate(sys.argv) if l.startswith('--gcloud')]
+    for i in reversed(gcloud_args_ix):
+        param = sys.argv[i]
+        if param.startswith("--gcloud-project"):
+            project = param[17:]
+        elif param.startswith("--gcloud-config"):
+            config = param[16:]
+        else:
+            raise RuntimeError("luigi-gcloud only support: --gcloud-project and --gcloud-config")
+        del sys.argv[i]
+    print("luigi-gcloud will use project: " + project + " with configuration: " + config)
+    default_client = GCloudClient(name=project, config=config)
 
 
 def get_default_client():
