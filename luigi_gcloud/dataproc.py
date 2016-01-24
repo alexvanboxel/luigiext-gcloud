@@ -7,6 +7,7 @@ from luigi_gcloud.storage import GCSFileSystem
 logger = logging.getLogger('luigi-gcloud')
 
 default_pig_udf = None
+default_spark_udf = None
 
 
 class _DataProcJob:
@@ -57,6 +58,18 @@ class DataProcPigTask(_GCloudTask):
     def lib_uris(self):
         return []
 
+    def _jar_file_uris(self):
+        global default_pig_udf
+        artifacts = []
+        uris = self.lib_uris()
+        artifacts.extend(uris)
+        if default_pig_udf is not None:
+            if not default_pig_udf.get('append') and len(uris) == 0:
+                artifacts.extend(default_pig_udf.get('uris'))
+            elif default_pig_udf.get('append'):
+                artifacts.extend(default_pig_udf.get('uris'))
+        return artifacts
+
     def run(self):
         http = self.client.http_authorized()
         dataproc_api = self.client.dataproc_api(http)
@@ -66,8 +79,6 @@ class DataProcPigTask(_GCloudTask):
             fs = GCSFileSystem()
             fs.put(self.query_file(),
                    self.query_uri())
-
-        artifacts = self.lib_uris()
 
         job = {
             "job": {
@@ -81,7 +92,7 @@ class DataProcPigTask(_GCloudTask):
                 "pigJob": {
                     "continueOnFailure": False,
                     "queryFileUri": self.query_uri(),
-                    "jarFileUris": artifacts,
+                    "jarFileUris": self._jar_file_uris(),
                 }
             }
         }
@@ -114,15 +125,15 @@ class DataProcSparkTask(_GCloudTask):
         return []
 
     def _jar_file_uris(self):
-        global default_pig_udf
+        global default_spark_udf
         artifacts = [self.job_uri()]
         uris = self.lib_uris()
         artifacts.extend(uris)
         if default_pig_udf is not None:
-            if not default_pig_udf.append and len(uris) == 0:
-                artifacts.extend(default_pig_udf.uris)
-            elif default_pig_udf.append:
-                artifacts.extend(default_pig_udf.uris)
+            if not default_spark_udf.get('append') and len(uris) == 0:
+                artifacts.extend(default_spark_udf.get('uris'))
+            elif default_spark_udf.get('append'):
+                artifacts.extend(default_spark_udf.get('uris'))
         return artifacts
 
     def run(self):
@@ -164,6 +175,14 @@ class DataProcSparkTask(_GCloudTask):
 def set_default_pig_udf(uris, append=False):
     global default_pig_udf
     default_pig_udf = {
+        'append': append,
+        'uris': uris
+    }
+
+
+def set_default_spark_udf(uris, append=False):
+    global default_spark_udf
+    default_spark_udf = {
         'append': append,
         'uris': uris
     }
