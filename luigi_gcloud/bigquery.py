@@ -12,6 +12,8 @@ from luigi_gcloud.storage import GCSTarget
 
 logger = logging.getLogger('luigi-gcloud')
 
+default_bigquery_udf = None
+
 try:
     import apiclient
     from apiclient import discovery
@@ -211,7 +213,7 @@ class BigQueryTask(_BqTask):
         if self.destination() is not None:
             destination = self.destination()
             if destination.find('*') != -1:
-                destination = destination[:destination.rindex('/')+1]
+                destination = destination[:destination.rindex('/') + 1]
             return GCSTarget(destination)
 
     def schema(self):
@@ -230,12 +232,27 @@ class BigQueryTask(_BqTask):
     def destination(self):
         return None
 
+    def lib_uris(self):
+        return []
+
     def _success(self):
         marker = self.output()
         if hasattr(marker, "touch") and callable(getattr(marker, "touch")):
             logger.info("Writing marker file " + str(marker))
             marker.touch()
         return
+
+    def _js_file_uris(self):
+        global default_bigquery_udf
+        artifacts = []
+        uris = self.lib_uris()
+        artifacts.extend(uris)
+        if default_bigquery_udf is not None:
+            if not default_bigquery_udf.get('append') and len(uris) == 0:
+                artifacts.extend(default_bigquery_udf.get('uris'))
+            elif default_bigquery_udf.get('append'):
+                artifacts.extend(default_bigquery_udf.get('uris'))
+        return artifacts
 
     def run(self):
         query = Template(self.query()).substitute(self.variables())
@@ -252,6 +269,17 @@ class BigQueryTask(_BqTask):
             job["configuration"]["schema"] = {
                 'fields': schema
             }
+
+        udf = self._js_file_uris()
+        if len(udf) > 0:
+            job["configuration"]["query"]["userDefinedFunctionResources"] = []
+            for uri in udf:
+                job["configuration"]["query"]["userDefinedFunctionResources"].append(
+                    {
+                        "resourceUri": uri
+                    }
+                )
+
         if self.table() is None and self.destination() is None:
             raise RuntimeError("At least table or destination need to be supplied.")
         if self.table() is not None and self.destination() is not None:
@@ -270,6 +298,7 @@ class BigQueryTask(_BqTask):
                 self.get_service_value("writeDisposition", "WRITE_APPEND")
             job["configuration"]["query"]["allowLargeResults"] = \
                 self.get_service_value("allowLargeResults", "false")
+
             insert_job = _BqJob(self.bigquery_api, self.client.project_id(), job=job)
             if insert_job.wait_for_done():
                 self._success()
