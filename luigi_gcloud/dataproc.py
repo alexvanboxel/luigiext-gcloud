@@ -31,6 +31,12 @@ class _DataProcJob:
                 logger.error(self.job['status']['details'])
                 logger.debug(str(self.job))
                 return False
+            if 'CANCELLED' == self.job['status']['state']:
+                print(str(self.job))
+                logger.warning('DataProc job %s is cancelled', self.job_id)
+                logger.warning(self.job['status']['details'])
+                logger.debug(str(self.job))
+                return False
             if 'DONE' == self.job['status']['state']:
                 return True
             logger.debug('DataProc job %s is %s', self.job_id, str(self.job['status']['state']))
