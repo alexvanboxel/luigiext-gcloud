@@ -74,7 +74,7 @@ class _BqJob:
                 else:
                     logger.info('BigQuery job %s is DONE', self.job_id)
                     return True
-            logger.info('BigQuery job %s is %s', self.job_id, str(self.job['status']))
+            logger.debug('BigQuery job %s is %s', self.job_id, str(self.job['status']))
             time.sleep(5)
 
     def raise_error(self, message):

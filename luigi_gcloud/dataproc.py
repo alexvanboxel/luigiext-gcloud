@@ -33,7 +33,7 @@ class _DataProcJob:
                 return False
             if 'DONE' == self.job['status']['state']:
                 return True
-            logger.info('DataProc job %s is %s', self.job_id, str(self.job['status']['state']))
+            logger.debug('DataProc job %s is %s', self.job_id, str(self.job['status']['state']))
             time.sleep(5)
 
     def raise_error(self, message=None):
