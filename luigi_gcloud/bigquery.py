@@ -220,7 +220,12 @@ class BigQueryTask(_BqTask):
         return None
 
     def query(self):
-        raise NotImplementedError
+        with open(self.query_file(), 'r') as f:
+            content = f.read()
+        return content
+
+    def query_file(self):
+        return NotImplementedError
 
     def table(self):
         """
