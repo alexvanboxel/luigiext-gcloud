@@ -307,6 +307,8 @@ class BigQueryTask(_BqTask):
             insert_job = _BqJob(self.bigquery_api, self.client.project_id(), job=job)
             if insert_job.wait_for_done():
                 self._success()
+            else:
+                insert_job.raise_error("Error executing query in Google BigQuery")
 
         if self.destination() is not None:
             large = self.get_service_value("allowLargeResults", "false")
@@ -344,3 +346,7 @@ class BigQueryTask(_BqTask):
                 extract_job = _BqJob(self.bigquery_api, self.client.project_id(), job=job)
                 if extract_job.wait_for_done():
                     self._success()
+                else:
+                    extract_job.raise_error("Error extracting query data from Google BigQuery")
+            else:
+                insert_job.raise_error("Error quering to temp table in Google BigQuery")
