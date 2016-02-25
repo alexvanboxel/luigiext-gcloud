@@ -135,7 +135,6 @@ class _GCloudTask(luigi.Task):
     client = None
     service_name = None
     bigquery_api = None
-    service_name = None
     uuid = str(uuid.uuid1())[:13]
     _resolved_name = None
 

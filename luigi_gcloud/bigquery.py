@@ -23,10 +23,10 @@ except ImportError:
 
 
 def _table_with_default(name, client):
-    return _split_tablename(name, client.project_id(), client.get("bigquery", "tempDataset"))
+    return _split_tablename(name, client.project_id())
 
 
-def _split_tablename(name, default_project=None, default_dataset=None):
+def _split_tablename(name, default_project=None):
     cmpt = name.split(':')
     if len(cmpt) == 1:
         project_id = default_project
@@ -38,10 +38,7 @@ def _split_tablename(name, default_project=None, default_dataset=None):
         raise RuntimeError
 
     cmpt = rest.split('.')
-    if len(cmpt) == 1:
-        dataset_id = default_dataset
-        table_id = cmpt[0]
-    elif len(cmpt) == 2:
+    if len(cmpt) == 2:
         dataset_id = cmpt[0]
         table_id = cmpt[1]
     else:
@@ -318,7 +315,7 @@ class BigQueryTask(_BqTask):
                 # we need a DataSet that has an expiration to make it work properly in production
                 job["configuration"]["query"]["destinationTable"] = {
                     'projectId': self.client.project_id(),
-                    'datasetId': self.get_service_value("bigquery", "tempDataset"),
+                    'datasetId': self.get_service_value("tempDataset", "work_temp"),
                     'tableId': datetime.now().strftime("xlbq_%Y%m%d%H%M%S")
                 }
                 job["configuration"]["query"]["allowLargeResults"] = "true"
@@ -349,4 +346,4 @@ class BigQueryTask(_BqTask):
                 else:
                     extract_job.raise_error("Error extracting query data from Google BigQuery")
             else:
-                insert_job.raise_error("Error quering to temp table in Google BigQuery")
+                insert_job.raise_error("Error querying to temp table in Google BigQuery")
