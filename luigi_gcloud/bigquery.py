@@ -80,8 +80,8 @@ class _BqJob:
 
 
 class BigQueryTarget(luigi.Target):
-    def __init__(self, table, query=None, client=get_default_client()):
-        self.client = client
+    def __init__(self, table, query=None, client=None):
+        self.client = client or get_default_client()
         self.table = _table_with_default(table, self.client)
         self.query = query
         http = self.client.http_authorized()
