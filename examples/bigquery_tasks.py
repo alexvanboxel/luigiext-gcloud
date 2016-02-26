@@ -2,7 +2,6 @@ import luigi
 
 import target
 from luigi_gcloud.bigquery import BigQueryLoadTask, BigQueryTask
-from luigi_gcloud.gcore import load_query_file
 from storage_tasks import CopyLocalToStorage
 
 
@@ -24,7 +23,7 @@ class CopyBigQueryToStorage(BigQueryTask):
         }
 
     def query(self):
-        return load_query_file("examples/queries/bq_select_example_copy.bq")
+        return "SELECT * FROM [${temp_dataset}.example_copy]"
 
 
 class CopyBigQueryToBigQuery(BigQueryTask):
@@ -34,15 +33,16 @@ class CopyBigQueryToBigQuery(BigQueryTask):
         return CopyStorageToBigQuery(day=self.day)
 
     def table(self):
-        return "example_copy"
+        ds = self.get_service_value('tempDataset')
+        return ds + ".example_copy"
 
     def variables(self):
         return {
             'temp_dataset': self.get_service_value('tempDataset')
         }
 
-    def query(self):
-        return load_query_file("examples/queries/bq_select_example_mail.bq")
+    def query_file(self):
+        return "examples/queries/bq_select_example_mail.bq"
 
 
 class CopyStorageToBigQuery(BigQueryLoadTask):
@@ -52,7 +52,8 @@ class CopyStorageToBigQuery(BigQueryLoadTask):
         return CopyLocalToStorage(self.day)
 
     def table(self):
-        return "example_mail"
+        ds = self.get_service_value('tempDataset')
+        return ds + ".example_mail"
 
     def source(self):
         return target.storage_mail_path(self.day).path

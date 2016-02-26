@@ -22,12 +22,6 @@ except ImportError:
                    "runtime if gcloud functionality is used.")
 
 
-def load_query_file(file_name):
-    with open(file_name, 'r') as f:
-        content = f.read()
-    return content
-
-
 class GCloudClient:
     def __init__(self, **kwargs):
         scope = kwargs.get("scope") or [
