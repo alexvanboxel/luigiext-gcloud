@@ -137,6 +137,7 @@ class _GCloudTask(luigi.Task):
     bigquery_api = None
     uuid = str(uuid.uuid1())[:13]
     _resolved_name = None
+    _attempt = 0
 
     def variables(self):
         return None
@@ -146,6 +147,20 @@ class _GCloudTask(luigi.Task):
 
     def name(self):
         return type(self).__name__
+
+    def resolved_name(self):
+        if self._resolved_name is None:
+            name = self.name()
+            if self.variables() is not None:
+                name = Template(self.name()).substitute(self.variables())
+            self._resolved_name = name + "__" + self.uuid
+        return self._resolved_name
+
+    def job_name(self):
+        return self.resolved_name() + "_" + str(self._attempt)
+
+    def start_job(self):
+        self._attempt += 1
 
     def resolved_name(self):
         if self._resolved_name is None:

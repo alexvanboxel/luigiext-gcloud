@@ -77,9 +77,10 @@ class DataProcPigTask(_GCloudTask):
         return artifacts
 
     def run(self):
+        self.start_job()
         http = self.client.http_authorized()
         dataproc_api = self.client.dataproc_api(http)
-        name = self.resolved_name()
+        name = self.job_name()
 
         if self.query_file() is not None:
             fs = GCSFileSystem()
@@ -143,9 +144,10 @@ class DataProcSparkTask(_GCloudTask):
         return artifacts
 
     def run(self):
+        self.start_job()
         http = self.client.http_authorized()
         dataproc_api = self.client.dataproc_api(http)
-        name = self.resolved_name()
+        name = self.job_name()
 
         if self.job_file() is not None:
             logger.warning("Copying job artifact to storage. Consider uploading outside of job.")
