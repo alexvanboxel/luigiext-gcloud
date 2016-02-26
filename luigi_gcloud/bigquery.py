@@ -14,13 +14,6 @@ logger = logging.getLogger('luigi-gcloud')
 
 default_bigquery_udf = None
 
-try:
-    import apiclient
-    from apiclient import discovery
-except ImportError:
-    logger.warning("Loading gcloud module without google-api-client installed. Will crash at "
-                   "runtime if gcloud functionality is used.")
-
 
 def _table_with_default(name, client):
     return _split_tablename(name, client.project_id())
@@ -90,7 +83,6 @@ class BigQueryTarget(luigi.Target):
     def __init__(self, table, query=None, client=get_default_client()):
         self.client = client
         self.table = _table_with_default(table, self.client)
-        logger.debug("TABLE SPLIT: " + str(self.table))
         self.query = query
         http = self.client.http_authorized()
         self.bigquery_api = self.client.bigquery_api(http)
@@ -124,7 +116,10 @@ class BigQueryTarget(luigi.Target):
                                               jobId=result['jobReference']['jobId']).execute()
                 return result['rows'][0]['f'][0]['v'] in ['true', 'True']
         except HttpError as err:
-            logger.warning("HttpError, could be table not found.")
+            if err.resp.status == 404:
+                return False
+            logger.error("HttpError, when checking existence of " + self.table['projectId'] + ":" + self.table[
+                'datasetId'] + "." + self.table['tableId'] + ".")
             logger.debug(str(err))
             return False
 
