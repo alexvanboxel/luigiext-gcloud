@@ -136,7 +136,7 @@ class DataProcSparkTask(_GCloudTask):
         artifacts = [self.job_uri()]
         uris = self.lib_uris()
         artifacts.extend(uris)
-        if default_pig_udf is not None:
+        if default_spark_udf is not None:
             if not default_spark_udf.get('append') and len(uris) == 0:
                 artifacts.extend(default_spark_udf.get('uris'))
             elif default_spark_udf.get('append'):
