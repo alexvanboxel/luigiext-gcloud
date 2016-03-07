@@ -59,7 +59,7 @@ class _BqJob:
                 projectId=self.project_id,
                 jobId=self.job_id).execute()
             if 'DONE' == self.job['status']['state']:
-                if self.job['status'].has_key('errors'):
+                if 'errors' in self.job['status']:
                     logger.warning('BigQuery job %s has errors', self.job_id)
                     logger.debug(str(self.job))
                     return False
@@ -70,7 +70,7 @@ class _BqJob:
             time.sleep(5)
 
     def raise_error(self, message):
-        if self.job['status'].has_key('errors'):
+        if 'errors' in self.job['status']:
             if message is None:
                 message = "Google BigQuery job has error"
             raise Exception(message + ": " + str(self.job['status']['errors']))
