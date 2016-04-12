@@ -342,3 +342,54 @@ class BigQueryTask(_BqTask):
                     extract_job.raise_error("Error extracting query data from Google BigQuery")
             else:
                 insert_job.raise_error("Error querying to temp table in Google BigQuery")
+
+
+class BigQueryViewTask(_BqTask):
+    """ Create a new view from a query
+
+        Query can be supplied either by overwriting the query_file method and providing the path to a file containing
+        the query OR by overwriting the query method and returning the query as a string.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(BigQueryViewTask, self).__init__(*args, **kwargs)
+
+    def output(self):
+        return BigQueryTarget(self.table(), None, self.client)
+
+    def query(self):
+        with open(self.query_file(), 'r') as f:
+            content = f.read()
+        return content
+
+    def query_file(self):
+        return NotImplementedError
+
+    def table(self):
+        """
+        Format: projectId:datasetId.tableId
+        :return:
+        """
+        return NotImplementedError
+
+    def run(self):
+        query = Template(self.query()).substitute(self.variables())
+        parsed_ids = _table_with_default(self.table(), self.client)
+
+        request_body = {
+            'tableReference': {
+                'projectId': parsed_ids['projectId'],
+                'datasetId': parsed_ids['datasetId'],
+                'tableId': parsed_ids['tableId']
+            },
+            'view': {
+                'query': query
+            }
+        }
+
+        insert_response = self.bigquery_api.tables().insert(projectId=parsed_ids['projectId'],
+                                                            datasetId=parsed_ids['datasetId'],
+                                                            body=request_body).execute()
+
+        if 'error' in insert_response:
+            raise Exception("Error in creating view: " + str(insert_response['error']['errors']))
