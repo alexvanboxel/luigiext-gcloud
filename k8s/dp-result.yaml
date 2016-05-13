@@ -1,0 +1,38 @@
+iotoiotapiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+  labels:
+    run: result
+  name: result
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: result
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: result
+    spec:
+      containers:
+      - image: gcr.io/example-project/result:1.1
+        imagePullPolicy: IfNotPresent
+        name: result
+        ports:
+        - containerPort: 5001
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

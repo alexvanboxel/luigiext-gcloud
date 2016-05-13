@@ -1,0 +1,14 @@
+apiVersion: v1
+data:
+  config.json: |
+    {
+      "name":"Alex Van Boxel",
+      "twitter":"@alexvb",
+      "location":"Belgium",
+      "repo":["example/votingapp_voting-app","example/votingapp_result-app"],
+      "vote":"K8S"
+    }
+kind: ConfigMap
+metadata:
+  name: configmap-result
+  namespace: default

@@ -1,0 +1,25 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-clash
+  namespace: default
+spec:
+  rules:
+  - host: clash-voting.ioto.pe
+    http:
+      paths:
+      - backend:
+          serviceName: voting
+          servicePort: 80
+  - host: clash-vote.ioto.pe
+    http:
+      paths:
+      - backend:
+          serviceName: voting
+          servicePort: 80
+  - host: clash-result.ioto.pe
+    http:
+      paths: 
+      - backend:
+          serviceName: result
+          servicePort: 80

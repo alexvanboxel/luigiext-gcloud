@@ -1,0 +1,46 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: voting
+    track: stable
+  name: voting-canary
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      run: voting
+      track: stable
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        run: voting
+        track: stable
+    spec:
+      containers:
+      - image: gcr.io/example-project/voting:1.1
+        imagePullPolicy: IfNotPresent
+        name: voting
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        env:
+        - name: OPTION_A
+          valueFrom:
+            configMapKeyRef:
+              name: configmap-voting
+              key: option.a
+        - name: OPTION_B
+          valueFrom:
+            configMapKeyRef:
+              name: configmap-voting
+              key: option.b
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
